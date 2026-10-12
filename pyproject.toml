@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rayon-sdk-py"
+version = "0.1.0"
+description = "Synchronous Python client for the Rayon API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Rayon API"}]
+dependencies = ["curl_cffi>=0.13,<1"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "build>=1.2", "twine>=6"]
+
+[project.urls]
+Homepage = "https://rayonapi.com"
+Repository = "https://github.com/Rayon-API/rayon-sdk-py"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
