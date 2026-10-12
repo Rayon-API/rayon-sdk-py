@@ -23,7 +23,7 @@ with OpenID Connect. No stored PyPI token is required.
 2. Run `python -m pytest`, `python -m build`, and `python -m twine check dist/*`.
    Inspect both archives for source, metadata, README, and the MIT license; exclude
    local configuration, credentials, caches, and build-only dependencies.
-3. Commit the reviewed changes and tag the same commit `v0.1.0` for version `0.1.0`.
+3. Commit the reviewed changes and tag the same commit `v1.0.0` for version `1.0.0`.
 4. Push the reviewed commit and tag, then publish a GitHub release for that tag.
    Creating a published release runs `.github/workflows/publish.yml`; drafts do not.
 5. The workflow checks tag/version agreement, tests all three Python versions,
@@ -32,3 +32,5 @@ with OpenID Connect. No stored PyPI token is required.
 
 PyPI versions cannot be overwritten. If a released package needs correction,
 increment the version and publish a new release.
+
+Version 1.0 is a breaking migration to the material-only API. Verify the README migration instructions, sync/async lifecycle, strict input limits, exact body preservation, error envelopes, expiry-scoped references, no automatic POST retries, and packed public type exports. Never rewrite the published 0.1 packages or their release tags. Do not include customer scripts, captured material, credentials, or private fixtures in distributions.

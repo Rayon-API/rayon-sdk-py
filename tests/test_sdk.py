@@ -1,481 +1,399 @@
-import importlib
+import asyncio
+import copy
+import json
+from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
 from curl_cffi import requests
+import rayon_sdk_py as sdk
+
+KEY = "test-secret-key"
+URL = "https://example.com/page"
 
 
-TARGET = "https://example.com/page"
-KEY = "rayon_test_secret"
-
-
-def accepted(**changes):
-    body = {
-        "status": "accepted",
-        "method": "playwright",
-        "target_url": TARGET,
-        "duration_ms": 123,
-        "headers": {
-            f"X-RandomPrefix-{suffix}": "" if suffix == "d" else f"secret-{suffix}"
-            for suffix in "abcdfz"
-        },
-        "cookies": [
-            {
-                "name": "session",
-                "value": "cookie-secret",
-                "domain": ".example.com",
-                "path": "/page",
-            }
+def shape(**changes):
+    value = dict(
+        source_url=URL,
+        scripts=[
+            dict(url="https://example.com/owned.js", source="/* owned material */")
         ],
-        "profile_used": {"user_agent": "profile-secret"},
-        "errors": ["Earlier tier failed"],
-    }
-    body.update(changes)
-    return body
+        profile={"language": "en-GB"},
+        request=dict(
+            url=URL,
+            method="POST",
+            content_type="application/json",
+            body=' {"hello": 1}\n',
+        ),
+        document_cookie="session=current",
+    )
+    value.update(changes)
+    return value
 
 
-class Response:
-    def __init__(self, body=None, status=200, headers=None):
-        self.body = accepted() if body is None else body
-        self.status_code = status
-        self.headers = requests.Headers(headers or {})
-
-    def json(self):
-        if isinstance(self.body, Exception):
-            raise self.body
-        return self.body
-
-
-@pytest.fixture
-def sdk():
-    try:
-        return importlib.import_module("rayon_sdk_py")
-    except ModuleNotFoundError:
-        pytest.fail("The public SDK module is not implemented")
+def result(**changes):
+    value = dict(
+        headers={
+            f"X-Dynamic-{s}": "" if s == "d" else "secret-value" for s in "abcdfz"
+        },
+        request_id="req-123",
+        generation_ms=12,
+        profile_used={"language": "en-GB"},
+        material_ref="ref_0123456789abcdef",
+        material_expires_at=(
+            datetime.now(timezone.utc) + timedelta(minutes=1)
+        ).isoformat(),
+    )
+    value.update(changes)
+    return value
 
 
 @pytest.fixture
 def transport(monkeypatch):
-    state = {"response": Response(), "calls": [], "session_options": []}
+    state = {"calls": [], "options": [], "body": result(), "status": 200, "headers": {}}
 
     class Session:
         def __init__(self, **options):
-            state["session_options"].append(options)
+            state["options"].append(options)
 
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
+        def close(self):
             state["closed"] = True
 
-        def post(self, url, **options):
-            state["calls"].append((url, options))
-            if "exception" in state:
+        def request(self, method, url, **options):
+            state["calls"].append((method, url, options))
+            if state.get("exception"):
                 raise state["exception"]
-            for chunk in state.get("chunks", []):
-                callback = options.get("content_callback")
-                if callback is not None and callback(chunk) != len(chunk):
-                    state["aborted"] = True
-                    raise requests.exceptions.RequestException("Body callback aborted")
-            return state["response"]
+            raw = (
+                json.dumps(state["body"]).encode()
+                if "raw" not in state
+                else state["raw"]
+            )
+            callback = options["content_callback"]
+            if callback(raw) != len(raw):
+                raise requests.exceptions.RequestException("secret transport")
+            return SimpleNamespace(
+                status_code=state["status"], headers=requests.Headers(state["headers"])
+            )
+
+    class AsyncSession(Session):
+        async def request(self, *args, **kwargs):
+            return super().request(*args, **kwargs)
+
+        async def close(self):
+            super().close()
 
     monkeypatch.setattr(requests, "Session", Session)
+    monkeypatch.setattr(requests, "AsyncSession", AsyncSession)
     return state
 
 
-def test_solve_sends_only_public_body_and_returns_accepted_fallback(transport):
-    try:
-        sdk = importlib.import_module("rayon_sdk_py")
-    except ModuleNotFoundError:
-        pytest.fail("The public SDK module is not implemented")
-    profile = {"user_agent": "Chrome"}
-    result = sdk.solve(TARGET, KEY, profile=profile)
-    assert isinstance(result, sdk.SolveResult)
-    assert result.status == "accepted"
-    assert result.errors == ["Earlier tier failed"]
-    assert result.headers["X-RandomPrefix-d"] == ""
-    assert result.cookies == accepted()["cookies"]
-    assert result.profile_used == accepted()["profile_used"]
-    url, options = transport["calls"][0]
-    assert url == "https://api.rayonapi.com/solve"
-    assert options["json"] == {"target_url": TARGET, "profile": profile}
+def test_material_contract_and_persistent_fresh_requests(transport):
+    with sdk.Client(KEY) as client:
+        first = client.generate(shape())
+        second = client.generate(
+            shape(
+                profile={"language": "fr"},
+                document_cookie="new",
+                request=dict(
+                    url=URL, method="PUT", content_type="text/plain", body=" exact\n"
+                ),
+            )
+        )
+        client.usage()
+        assert isinstance(first, sdk.ShapeResult)
+        assert first.headers["X-Dynamic-d"] == ""
+        assert "secret-value" not in repr(first)
+        assert KEY not in repr(client)
+        assert second.generation_ms == 12
+    assert transport["closed"]
+    assert len(transport["options"]) == 1
+    assert "impersonate" not in transport["options"][0]
+    assert transport["options"][0]["trust_env"] is False
+    method, url, options = transport["calls"][0]
+    assert (method, url) == ("POST", "https://api.rayonapi.com/v1/shape")
+    assert options["json"] == shape()
     assert options["headers"]["Authorization"] == f"Bearer {KEY}"
-    assert options["timeout"] == 150
     assert options["allow_redirects"] is False
-    assert transport["session_options"][0]["trust_env"] is False
-    assert transport["session_options"][0]["impersonate"] == "chrome"
+    assert transport["calls"][1][2]["json"]["request"]["body"] == " exact\n"
+    assert transport["calls"][1][2]["json"]["profile"] == {"language": "fr"}
+    assert transport["calls"][1][2]["json"]["document_cookie"] == "new"
+    assert transport["calls"][1][2]["json"]["material_ref"] == "ref_0123456789abcdef"
+    assert "scripts" not in transport["calls"][1][2]["json"]
+    assert transport["calls"][2][0:2] == ("GET", "https://api.rayonapi.com/v1/usage")
+
+
+def test_async_lifecycle(transport):
+    async def run():
+        async with sdk.AsyncClient(KEY) as client:
+            assert (await client.generate(shape())).request_id == "req-123"
+            await client.usage()
+
+    asyncio.run(run())
     assert transport["closed"]
 
 
-def test_defaults_omit_profile_and_custom_base_is_supported(sdk, transport):
-    sdk.solve(TARGET, KEY, base_url="http://localhost:8080/api/", timeout=2.5)
-    url, options = transport["calls"][0]
-    assert url == "http://localhost:8080/api/solve"
-    assert options["json"] == {"target_url": TARGET}
-    assert options["timeout"] == 2.5
-
-
-def test_result_repr_hides_replay_credentials(sdk, transport):
-    result = sdk.solve(TARGET, KEY)
-    assert all(
-        secret not in repr(result)
-        for secret in (KEY, "cookie-secret", "profile-secret", "secret-a")
-    )
-
-
 @pytest.mark.parametrize(
-    "target",
+    "change",
     [
-        None,
-        "",
-        "ftp://example.com",
-        "https:///page",
-        "https://u:p@example.com",
-        "https://example.com\n",
-        "https://example.com:bad",
-        "https://example.com/#fragment",
+        {"scripts": []},
+        {"scripts": [{"url": URL, "source": "x"}] * 17},
+        {"material_ref": "ref"},
+        {"profile": {"unknown": True}},
+        {"profile": {"screen": {"width": "wide"}}},
+        {"profile": {"navigator": {"unknown": 1}}},
+        {"profile": {"window": {"devicePixelRatio": float("nan")}}},
+        {"request": {"url": URL, "method": "POST", "content_type": None, "body": {}}},
+        {
+            "request": {
+                "url": URL,
+                "method": "POST",
+                "content_type": None,
+                "body": "x" * (256 * 1024 + 1),
+            }
+        },
+        {"scripts": [{"url": URL, "source": "x" * (3 * 1024 * 1024 + 1)}]},
+        {"source_url": "https://user:pass@example.com"},
     ],
 )
-def test_invalid_target_never_reaches_network(sdk, transport, target):
+def test_invalid_shape_before_network(transport, change):
     with pytest.raises(sdk.ValidationError):
-        sdk.solve(target, KEY)
-    assert not transport["calls"]
-
-
-@pytest.mark.parametrize(
-    "key", [None, "", " ", "key\r\nx: value", "key with space", "é"]
-)
-def test_invalid_api_key_never_reaches_network(sdk, transport, key):
-    with pytest.raises(sdk.ValidationError):
-        sdk.solve(TARGET, key)
-    assert not transport["calls"]
-
-
-@pytest.mark.parametrize(
-    "timeout", [0, -1, float("inf"), float("nan"), None, True, "10"]
-)
-def test_invalid_timeout_never_reaches_network(sdk, transport, timeout):
-    with pytest.raises(sdk.ValidationError):
-        sdk.solve(TARGET, KEY, timeout=timeout)
+        sdk.generate(shape(**change), KEY)
     assert not transport["calls"]
 
 
 @pytest.mark.parametrize(
     "base",
     [
-        None,
-        "",
-        "ftp://example.com",
-        "http://example.com",
+        "http://remote.example",
         "https://u:p@example.com",
-        "https://example.com?key=secret",
-        "https://example.com#fragment",
-        "https://example.com\t",
-        "https://example.com:bad",
+        "https://example.com?key=1",
+        "https://example.com#",
+        "https:///example.com",
+        "https://example.com:0",
     ],
 )
-def test_invalid_base_url_never_reaches_network(sdk, transport, base):
+def test_unsafe_base(transport, base):
     with pytest.raises(sdk.ValidationError):
-        sdk.solve(TARGET, KEY, base_url=base)
+        sdk.generate(shape(), KEY, base_url=base)
     assert not transport["calls"]
+
+
+@pytest.mark.parametrize("status", [301, 307, 401, 410, 429, 503])
+def test_error_envelope_sanitized_no_retries(transport, status):
+    transport.update(
+        status=status,
+        body={
+            "error": {
+                "code": "api_retired" if status == 410 else "rate_limited",
+                "message": KEY + " private",
+                "request_id": "req-safe",
+            }
+        },
+        headers={"Retry-After": "12"},
+    )
+    with pytest.raises(sdk.HTTPError) as caught:
+        sdk.generate(shape(), KEY)
+    assert caught.value.status_code == status
+    assert caught.value.request_id == "req-safe"
+    assert caught.value.retry_after == "12"
+    assert KEY not in repr(caught.value)
+    assert "private" not in str(caught.value)
+    assert len(transport["calls"]) == 1
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"headers": {"X-a": "x"}},
+        {"generation_ms": -1},
+        {"request_id": KEY},
+        {"profile_used": []},
+        {"headers": {f"X-{s}": "\n" for s in "abcdfz"}},
+    ],
+)
+def test_invalid_result(transport, change):
+    transport["body"] = result(**change)
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.generate(shape(), KEY)
+
+
+def test_bounded_response_and_redacted_transport(transport):
+    transport["raw"] = b"x" * (256 * 1024 + 1)
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.generate(shape(), KEY)
+    transport["exception"] = requests.exceptions.RequestException(KEY)
+    with pytest.raises(sdk.TransportError) as caught:
+        sdk.generate(shape(), KEY)
+    assert KEY not in repr(caught.value)
+
+
+def test_expired_and_distinct_material_never_reuse_ref(transport):
+    transport["body"] = result(material_expires_at="2000-01-01T00:00:00Z")
+    with sdk.Client(KEY) as client:
+        client.generate(shape())
+        client.generate(shape())
+        client.generate(shape(scripts=[{"url": URL, "source": "/* different */"}]))
+    assert all("scripts" in call[2]["json"] for call in transport["calls"])
+
+
+def test_retired_solve_not_exported():
+    assert not hasattr(sdk, "solve")
 
 
 @pytest.mark.parametrize(
     "profile",
     [
-        [],
-        {"bad": object()},
-        {"bad": float("nan")},
-        {"profile": "bad"},
-        {1: "bad"},
-        {"nested": {1: "bad"}},
+        {"canvas": {"data_url": "bad"}},
+        {"user_agent": "one", "navigator": {"userAgent": "two"}},
+        {"language": "x" * 65536},
+        {"screen": {"width": True}},
     ],
 )
-def test_invalid_profile_never_reaches_network(sdk, transport, profile):
+def test_profile_bounds_and_alias_conflicts(transport, profile):
     with pytest.raises(sdk.ValidationError):
-        sdk.solve(TARGET, KEY, profile=profile)
+        sdk.generate(shape(profile=profile), KEY)
     assert not transport["calls"]
 
 
-@pytest.mark.parametrize("status", [401, 403, 422, 429, 503])
-def test_http_errors_are_safe_and_expose_diagnostics(sdk, transport, status):
-    transport["response"] = Response(
-        {"secret": KEY}, status, {"X-Request-ID": "req-123", "Retry-After": "30"}
-    )
-    with pytest.raises(sdk.HTTPError) as caught:
-        sdk.solve(TARGET, KEY)
-    error = caught.value
-    assert error.status_code == status
-    assert error.request_id == "req-123"
-    assert error.retry_after == "30"
-    assert KEY not in str(error) + repr(error)
-    assert len(transport["calls"]) == 1
+def test_total_material_bound_and_unicode_encoding(transport):
+    scripts = [
+        {"url": URL, "source": "x" * (3 * 1024 * 1024)},
+        {"url": URL, "source": "y" * (2 * 1024 * 1024)},
+    ]
+    with pytest.raises(sdk.ValidationError):
+        sdk.generate(shape(scripts=scripts), KEY)
+    with pytest.raises(sdk.ValidationError):
+        sdk.generate(shape(scripts=[{"url": URL, "source": "é" * (800 * 1024)}]), KEY)
+    assert not transport["calls"]
 
 
-@pytest.mark.parametrize("status", [301, 302, 307, 308])
-def test_redirects_are_typed_and_not_followed(sdk, transport, status):
-    transport["response"] = Response(
-        status=status, headers={"Location": f"https://example.com/{KEY}"}
-    )
-    with pytest.raises(sdk.RedirectError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert caught.value.status_code == status
-    assert KEY not in str(caught.value)
-    assert len(transport["calls"]) == 1
+@pytest.mark.parametrize("key", [None, "", " ", "key with space", "key\n", "é"])
+def test_key_validation(transport, key):
+    with pytest.raises(sdk.ValidationError):
+        sdk.generate(shape(), key)
+    assert not transport["calls"]
 
 
-def test_network_failure_is_typed_safe_and_not_retried(sdk, transport):
-    transport["exception"] = requests.exceptions.RequestException(
-        f"Authorization: {KEY}"
-    )
-    with pytest.raises(sdk.TransportError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert KEY not in str(caught.value) + repr(caught.value)
-    assert caught.value.__cause__ is None
-    assert len(transport["calls"]) == 1
+@pytest.mark.parametrize("timeout", [0, -1, True, float("nan"), float("inf"), 2147484])
+def test_deadline_validation(transport, timeout):
+    with pytest.raises(sdk.ValidationError):
+        sdk.generate(shape(), KEY, timeout=timeout)
+    assert not transport["calls"]
 
 
-@pytest.mark.parametrize("failure", [ValueError, UnicodeError, RecursionError])
-def test_invalid_json_is_typed_safe(sdk, transport, failure):
-    transport["response"] = Response(failure(KEY))
-    with pytest.raises(sdk.InvalidResponseError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert KEY not in str(caught.value)
-    assert caught.value.__cause__ is None
+def test_certificate_validation_remains_enabled_and_api_cookies_discarded(transport):
+    sdk.generate(shape(), KEY)
+    opts = transport["calls"][0][2]
+    assert opts["verify"] is True
+    assert opts["discard_cookies"] is True
 
 
-def test_cookie_scope_and_extra_metadata_are_preserved(sdk, transport):
-    cookies = [
-        {"name": "session", "value": "first", "domain": "example.com", "path": "/"},
+@pytest.mark.parametrize("body", [b"{", b"x" * (256 * 1024 + 1)])
+def test_invalid_usage_response_bounded(transport, body):
+    transport["raw"] = body
+    with sdk.Client(KEY) as client:
+        with pytest.raises(sdk.InvalidResponseError):
+            client.usage()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"scripts": [{"url": URL, "source": "x" * (2 * 1024 * 1024 + 1)}]},
         {
-            "name": "session",
-            "value": "second",
-            "domain": ".example.com",
-            "path": "/page",
-            "future": {"flag": True},
+            "scripts": [
+                {"url": URL, "source": "x" * (2 * 1024 * 1024)},
+                {"url": URL, "source": "y" * (1024 * 1024 + 1)},
+            ]
         },
-    ]
-    transport["response"] = Response(accepted(cookies=cookies))
-    result = sdk.solve(TARGET, KEY)
-    assert result.cookies == cookies
-    assert all(
-        "secure" not in cookie and "expiry" not in cookie for cookie in result.cookies
-    )
-
-
-def test_header_family_is_case_insensitive_and_prefix_is_variable(sdk, transport):
-    headers = {
-        f"Telemetry_9-{suffix}": "" if suffix == "D" else "value" for suffix in "ABCDfZ"
-    }
-    transport["response"] = Response(accepted(headers=headers))
-    assert sdk.solve(TARGET, KEY).headers == headers
-
-
-@pytest.mark.parametrize("value", ["value\u0100", "value\u20ac", "value\U0001f680"])
-def test_response_headers_reject_characters_outside_latin1(sdk, transport, value):
-    headers = {**accepted()["headers"], "X-RandomPrefix-a": value}
-    transport["response"] = Response(accepted(headers=headers))
-    with pytest.raises(sdk.InvalidResponseError):
-        sdk.solve(TARGET, KEY)
-
-
-def test_response_headers_allow_latin1_values(sdk, transport):
-    headers = {**accepted()["headers"], "X-RandomPrefix-a": "value\u00e9"}
-    transport["response"] = Response(accepted(headers=headers))
-    assert sdk.solve(TARGET, KEY).headers == headers
-
-
-@pytest.mark.parametrize("prefix", ["X-\u212a", "X-\u0130"])
-def test_response_header_names_reject_unicode_casefold_matches(sdk, transport, prefix):
-    headers = {f"{prefix}-{suffix}": "value" for suffix in "abcdfz"}
-    transport["response"] = Response(accepted(headers=headers))
-    with pytest.raises(sdk.InvalidResponseError):
-        sdk.solve(TARGET, KEY)
-
-
-def test_header_family_has_no_arbitrary_field_length_limits(sdk, transport):
-    prefix = "X-" + "P" * 300
-    headers = {f"{prefix}-{suffix}": "value" * 4000 for suffix in "abcdfz"}
-    transport["response"] = Response(accepted(headers=headers))
-    assert sdk.solve(TARGET, KEY).headers == headers
-
-
-def test_cycle_in_profile_is_a_validation_error(sdk, transport):
-    profile = {}
-    profile["nested"] = profile
+        {"document_cookie": "x" * (16 * 1024 + 1)},
+        {"profile": {"screen": {"width": 0}}},
+        {"profile": {"languages": []}},
+        {"profile": {"window": {"devicePixelRatio": 17}}},
+        {"profile": {"canvas": {"data_url": "data:image/png;base64,"}}},
+        {
+            "request": {
+                "url": URL,
+                "method": "GET",
+                "content_type": "application/json",
+                "body": "x",
+            }
+        },
+        {"request": {"url": URL, "method": "POST", "content_type": None, "body": "x"}},
+        {
+            "request": {
+                "url": URL,
+                "method": "POST",
+                "content_type": "application/octet-stream",
+                "body": "x",
+            }
+        },
+    ],
+)
+def test_gateway_contract_limits(transport, change):
     with pytest.raises(sdk.ValidationError):
-        sdk.solve(TARGET, KEY, profile=profile)
+        sdk.generate(shape(**change), KEY)
     assert not transport["calls"]
 
 
-@pytest.mark.parametrize("status", ["failed", "rejected"])
-def test_nonaccepted_200_throws_solve_failure(sdk, transport, status):
-    transport["response"] = Response(accepted(status=status, headers={}, errors=[KEY]))
-    with pytest.raises(sdk.SolveFailedError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert caught.value.result.status == status
-    assert caught.value.result.errors == [KEY]
-    assert KEY not in str(caught.value) + repr(caught.value) + repr(caught.value.result)
+def test_real_sync_async_transport_compression_deadline_and_limits():
+    import gzip
+    import threading
+    import time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
 
-@pytest.mark.parametrize(
-    "changes",
-    [
-        {"status": "unexpected"},
-        {"method": "none"},
-        {"target_url": "https://different.example/"},
-        {"duration_ms": -1},
-        {"duration_ms": True},
-        {"duration_ms": 1.5},
-        {"headers": {"X-Prefix-a": "a"}},
-        {"headers": {f"X-Prefix-{s}": "" for s in "abcdfz"}},
-        {"headers": {**accepted()["headers"], "X-Other-a": "a"}},
-        {"headers": {**accepted()["headers"], "X-RandomPrefix-a": 1}},
-        {"headers": {**accepted()["headers"], "X-RandomPrefix-a": "a\r\nBad: value"}},
-        {"cookies": {}},
-        {"cookies": [{"name": "n", "value": "v"}]},
-        {"cookies": [{"name": "n", "value": 1, "domain": "example.com", "path": "/"}]},
-        {"profile_used": []},
-        {"errors": "error"},
-        {"errors": [1]},
-    ],
-)
-def test_malformed_response_is_rejected(sdk, transport, changes):
-    transport["response"] = Response(accepted(**changes))
-    with pytest.raises(sdk.InvalidResponseError):
-        sdk.solve(TARGET, KEY)
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(200)
+            mode = self.server.mode
+            if mode == "compressed":
+                self.send_header("Content-Encoding", "gzip")
+            self.end_headers()
+            try:
+                if mode == "slow":
+                    self.wfile.write(b"{")
+                    self.wfile.flush()
+                    time.sleep(0.3)
+                elif mode == "oversized":
+                    self.wfile.write(b"x" * (256 * 1024 + 1))
+                else:
+                    self.wfile.write(gzip.compress(json.dumps(result()).encode()))
+            except (BrokenPipeError, ConnectionResetError):
+                pass
 
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.mode = "compressed"
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with sdk.Client(KEY, base_url=base, timeout=0.1) as client:
+            assert client.generate(shape()).generation_ms == 12
+            server.mode = "oversized"
+            with pytest.raises(sdk.InvalidResponseError):
+                client.generate(shape())
+            server.mode = "slow"
+            started = time.monotonic()
+            with pytest.raises(sdk.TransportError):
+                client.generate(shape())
+            assert time.monotonic() - started < 0.25
 
-def test_missing_response_fields_are_not_synthesized(sdk, transport):
-    body = accepted()
-    del body["cookies"]
-    transport["response"] = Response(body)
-    with pytest.raises(sdk.InvalidResponseError):
-        sdk.solve(TARGET, KEY)
+        async def run():
+            server.mode = "compressed"
+            async with sdk.AsyncClient(KEY, base_url=base, timeout=0.1) as client:
+                assert (await client.generate(shape())).generation_ms == 12
+                server.mode = "slow"
+                started = time.monotonic()
+                with pytest.raises(sdk.TransportError):
+                    await client.generate(shape())
+                assert time.monotonic() - started < 0.25
 
-
-def test_actual_curl_adapter_disables_environment_proxy_without_network(
-    sdk, monkeypatch
-):
-    from curl_cffi import Curl, CurlError, CurlOpt
-
-    options = []
-    original = Curl.setopt
-
-    def setopt(curl, option, value):
-        options.append((option, value))
-        return original(curl, option, value)
-
-    def perform(curl):
-        raise CurlError("Network disabled by test", code=7)
-
-    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.invalid:3128")
-    monkeypatch.setenv("ALL_PROXY", "http://proxy.invalid:3128")
-    monkeypatch.setattr(Curl, "setopt", setopt)
-    monkeypatch.setattr(Curl, "perform", perform)
-    with pytest.raises(sdk.TransportError):
-        sdk.solve(TARGET, KEY)
-    assert (CurlOpt.PROXY, "") in options
-    assert (CurlOpt.FOLLOWLOCATION, 0) in options
-
-
-@pytest.mark.parametrize(
-    "request_id,retry_after",
-    [
-        (KEY, KEY),
-        ("prefix-" + KEY, "30\r\nBad: value"),
-        ("x" * 129, "99999999999"),
-        ("id\nsecret", "tomorrow"),
-        ("Bearer secret", "Fri, 99 Oct 2026 00:00:00 GMT"),
-    ],
-)
-def test_http_diagnostics_drop_reflected_credentials_and_invalid_headers(
-    sdk, transport, request_id, retry_after
-):
-    transport["response"] = Response(
-        status=429, headers={"X-Request-ID": request_id, "Retry-After": retry_after}
-    )
-    with pytest.raises(sdk.HTTPError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert caught.value.request_id is None
-    assert caught.value.retry_after is None
-    assert KEY not in str(caught.value.__dict__)
-
-
-def test_valid_http_date_retry_after_is_preserved(sdk, transport):
-    value = "Mon, 12 Oct 2026 10:00:00 GMT"
-    transport["response"] = Response(status=429, headers={"Retry-After": value})
-    with pytest.raises(sdk.HTTPError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert caught.value.retry_after == value
-
-
-def test_oversized_decoded_response_aborts_before_collecting_more(sdk, transport):
-    transport["chunks"] = [
-        b"x" * (1024 * 1024),
-        b"y" * (1024 * 1024),
-        b"z",
-        KEY.encode(),
-    ]
-    with pytest.raises(sdk.InvalidResponseError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert transport.get("aborted") is True
-    assert KEY not in str(caught.value)
-
-
-def test_actual_adapter_body_callback_limits_decoded_bytes_and_preserves_timeout(
-    sdk, monkeypatch
-):
-    from curl_cffi import Curl, CurlError, CurlOpt
-
-    options = {}
-    original = Curl.setopt
-
-    def setopt(curl, option, value):
-        options[option] = value
-        return original(curl, option, value)
-
-    def perform(curl):
-        callback = options.get(CurlOpt.WRITEFUNCTION)
-        if callable(callback):
-            assert callback(b"x" * (2 * 1024 * 1024)) == 2 * 1024 * 1024
-            assert callback(KEY.encode()) != len(KEY)
-        raise CurlError("Write aborted: " + KEY, code=23)
-
-    monkeypatch.setattr(Curl, "setopt", setopt)
-    monkeypatch.setattr(Curl, "perform", perform)
-    with pytest.raises(sdk.InvalidResponseError) as caught:
-        sdk.solve(TARGET, KEY)
-    assert callable(options[CurlOpt.WRITEFUNCTION])
-    assert options[CurlOpt.TIMEOUT_MS] == 150_000
-    assert KEY not in str(caught.value)
-
-
-def test_actual_adapter_parses_json_from_multiple_decoded_chunks(sdk, monkeypatch):
-    import json
-    from curl_cffi import Curl, CurlOpt
-
-    options = {}
-    original = Curl.setopt
-    payload = json.dumps(accepted()).encode()
-
-    def setopt(curl, option, value):
-        options[option] = value
-        return original(curl, option, value)
-
-    def perform(curl):
-        callback = options[CurlOpt.WRITEFUNCTION]
-        assert callback(payload[:30]) == 30
-        assert callback(payload[30:]) == len(payload) - 30
-
-    def parse_response(*args, **kwargs):
-        response = requests.Response()
-        response.status_code = 200
-        response.headers = requests.Headers({"X-Request-ID": "req-123"})
-        return response
-
-    monkeypatch.setattr(Curl, "setopt", setopt)
-    monkeypatch.setattr(Curl, "perform", perform)
-    monkeypatch.setattr(requests.Session, "_parse_response", parse_response)
-    result = sdk.solve(TARGET, KEY)
-    assert result.headers == accepted()["headers"]
-    assert result.cookies == accepted()["cookies"]
+        asyncio.run(run())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()

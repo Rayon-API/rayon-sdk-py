@@ -1,93 +1,56 @@
 # Rayon Python SDK
 
-A synchronous client for `POST /solve` on the Rayon API. Python 3.10 or newer is required.
-
-Install from PyPI:
+Material-only clients for `POST /v1/shape` and `GET /v1/usage`. Requires Python 3.10+.
 
 ```sh
-python -m pip install rayon-sdk-py
+python -m pip install 'rayon-sdk-py>=1,<2'
 ```
+
+Prepare JavaScript material from files you own or are authorized to use. URLs provide execution context; neither SDK nor API downloads them. Preserve script order.
 
 ```python
 import os
-from rayon_sdk_py import solve
+from pathlib import Path
+from rayon_sdk_py import Client, ShapeRequest
 
-result = solve(
-    "https://example.com/page",
-    os.environ["RAYON_API_KEY"],
-    # Optional JSON fingerprint values:
-    profile={"user_agent": "your browser user agent"},
-)
-print(result.status, result.method, result.duration_ms)
+shape: ShapeRequest = {
+    "source_url": "https://example.com/page",
+    "scripts": [{
+        "url": "https://example.com/assets/owned.js",
+        "source": Path("owned.js").read_text(encoding="utf-8"),
+    }],
+    "profile": {"user_agent": "your actual user agent", "language": "en-GB"},
+    "request": {
+        "url": "https://example.com/api/items",
+        "method": "POST",
+        "content_type": "application/json",
+        "body": ' {"item": 1}\n',  # Exact target body, including whitespace.
+    },
+    "document_cookie": "session=current",  # Current JavaScript-visible cookies.
+}
+with Client(os.environ["RAYON_API_KEY"]) as client:
+    result = client.generate(shape)
+    usage = client.usage()
+    # Explicitly access result.headers and result.profile_used for your target client.
 ```
 
-`solve(target_url, api_key, *, profile=None, base_url="https://api.rayonapi.com", timeout=150)`
-performs one request using curl_cffi Chrome impersonation. Timeout is a finite positive
-number of seconds. The SDK disables redirects and environment proxies, and never retries.
-Decoded response bodies are limited to 2 MiB; larger responses stop the transfer
-and raise `InvalidResponseError`.
-Custom API endpoints require HTTPS; HTTP is supported only for `localhost`, `127.0.0.1`,
-or `[::1]` development endpoints. URLs cannot contain credentials or fragments;
-the API base URL also cannot contain a query.
+`Client(api_key, *, base_url="https://api.rayonapi.com", timeout=150)` owns a persistent ordinary-TLS session. Close it with `with` or `client.close()`. `AsyncClient` has the same operations using `async with`, `await client.generate(shape)`, `await client.usage()`, and `await client.aclose()`. `generate(shape, api_key, *, base_url=..., timeout=150)` is a one-shot helper. API keys remain in the Bearer authorization header.
 
-The request body contains only `target_url` and, when supplied, `profile`.
-The API key is sent as a Bearer authorization header. Use an account and target
-domain approved for your application.
+Supply exactly one of `scripts` and `material_ref`. `source_url`, `profile`, and all four `request` fields are always required. Use `body=None` when the target request has no body; an empty string represents an explicit empty body. GET and HEAD require `body=None`; a supplied body requires a supported text content type. Bodies are never parsed, reformatted, or encoded as a JSON object by this SDK.
 
-An accepted result contains exactly one six-header family with a variable prefix
-and the suffixes `a`, `b`, `c`, `d`, `f`, and `z`; `d` may be empty.
-Acceptance means the headers were captured. It does not mean the target website
-verified them. `result.errors` can contain diagnostics from earlier solver tiers
-even when a fallback succeeds.
+Persistent clients cache only material references, keyed by source URL and ordered script URLs and source. Each cache is scoped to one client, API key, and server, and uses the server's `material_expires_at` expiry. Repeating the same material uses its unexpired reference; profile, request, and document cookies are freshly copied for every call. Expired entries trigger a fresh upload on the next call with scripts. A failed reference request is never automatically retried. You may also explicitly supply a server-issued reference together with its original source URL.
 
-`SolveResult` exposes `status`, `method`, `target_url`, `duration_ms`, `headers`,
-`cookies`, `profile_used`, and `errors`. Headers, cookies, URL, profile, and diagnostics
-are excluded from its repr because replay data can be sensitive.
+`BrowserProfile` accepts `user_agent`, `platform`, `language`, `languages`, `screen`, `window`, `webgl`, `canvas`, and `navigator`. Nested fields are strictly checked, and conflicting top-level/navigator aliases are rejected. `{}` selects server defaults. Screen/window dimensions, WebGL renderer/vendor, navigator identity, and a PNG `canvas.data_url` are supported. The response's effective `profile_used` omits canvas pixels.
 
-Cookies remain a list of records with required string fields `name`, `value`,
-`domain`, and `path`. Extra JSON metadata is preserved. Cookie scope matters:
-do not flatten cookies into a name/value dictionary. The SDK does not invent
-`secure`, expiry, or other browser attributes absent from the API response.
-When replaying a result, preserve cookie domains and paths and use the returned
-`profile_used` values for a compatible browser fingerprint.
+`ShapeResult` contains `headers`, `request_id`, `generation_ms`, `profile_used`, and optional `material_ref`/`material_expires_at`. The six header names use the actual dynamic common prefix and suffixes `a`, `b`, `c`, `d`, `f`, `z`; `d` may be empty. Generation does not assert target acceptance. No cookies, status, or internal execution method are returned. Sensitive headers, profile data, and references are excluded from repr.
 
-```python
-from curl_cffi.requests import Cookies
+Limits are 4 MiB of serialized request JSON, 16 scripts, 2 MiB per script and 3 MiB of total UTF-8 source, 256 KiB of UTF-8 target body, 64 KiB of profile JSON, and 16 KiB of document cookies. Decoded API responses are bounded to 256 KiB and stop the transfer when exceeded. Timeout covers the total API transfer. TLS certificate verification remains enabled; redirects and environment proxies are disabled. Custom bases require HTTPS, except local HTTP on `localhost`, `127.0.0.1`, or `[::1]`; credentials, fragments, and base queries are refused. API transport does not impersonate a browser.
 
-jar = Cookies()
-for cookie in result.cookies:
-    jar.set(cookie["name"], cookie["value"], domain=cookie["domain"], path=cookie["path"])
-# result.headers, jar, and result.profile_used are available for your replay client.
-```
+All errors inherit `RayonError`. `ValidationError` precedes network access; `TransportError` covers network failures; `InvalidResponseError` covers malformed/oversized responses. HTTP failures expose sanitized `status_code`, `request_id`, `code`, and `retry_after`; raw server messages and transport exception details are discarded. `RedirectError` and `MigrationError` inherit `HTTPError`. HTTP 410 requires migration; HTTP 429 exposes a validated `Retry-After` seconds or HTTP-date value. No request is retried automatically: admitted generations can consume quota.
 
-Handle failures explicitly:
+## Migration from 0.1
 
-```python
-import os
-from rayon_sdk_py import HTTPError, RayonError, SolveFailedError, solve
-
-try:
-    result = solve("https://example.com/page", os.environ["RAYON_API_KEY"])
-except SolveFailedError as exc:
-    # HTTP 200 with a failed/rejected result also raises.
-    print(exc.result.status)
-except HTTPError as exc:
-    print(exc.status_code, exc.request_id, exc.retry_after)
-except RayonError as exc:
-    print(str(exc))
-```
-
-All SDK errors inherit from `RayonError`. `ValidationError` is raised before
-network access; `TransportError` covers network failures; `RedirectError` is an
-`HTTPError`; `InvalidResponseError` covers invalid JSON or malformed responses.
-Exception messages do not include response bodies, credentials, or underlying
-transport messages. HTTP response errors expose `status_code`, `request_id`, and
-`retry_after` (a validated seconds or HTTP date header string, when present).
-Invalid diagnostic headers or values reflecting the API key are discarded.
-Decide whether and when
-to retry in your application; admitted solve attempts can consume quota.
-
-For local development:
+Version 1.0 removes the URL-only `solve` function and `SolveResult`. Replace it with `generate` and caller-prepared scripts (or a material reference), a fresh browser profile, and an exact target request context. Replace duration/status/method/cookie handling with `generation_ms`, `headers`, and `profile_used`. Existing published 0.1 distributions and tags remain unchanged; they target the retired API.
 
 ```sh
 python -m venv .venv
@@ -98,6 +61,4 @@ python -m build
 python -m twine check dist/*
 ```
 
-Tests are offline and patch the transport. CI tests Python 3.10, 3.12, and 3.14
-and builds the wheel and source distribution. See [RELEASE.md](RELEASE.md) for
-the trusted publisher setup. Licensed under [MIT](LICENSE).
+See [RELEASE.md](RELEASE.md) for release checks. Licensed under [MIT](LICENSE).
