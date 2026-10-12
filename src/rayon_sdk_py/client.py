@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import time
@@ -208,13 +209,22 @@ class AsyncClient(_BaseClient):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         options, content, state = self._options(body)
-        try:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + self._timeout
+
+        async def complete():
             response = await self._session.request(
                 method, self._base_url + path, **options
             )
-        except requests.exceptions.RequestException:
+            decoded = self._decode(response, content, state)
+            if loop.time() >= deadline:
+                raise asyncio.TimeoutError
+            return decoded
+
+        try:
+            return await asyncio.wait_for(complete(), timeout=self._timeout)
+        except (asyncio.TimeoutError, requests.exceptions.RequestException):
             self._failed(state)
-        return self._decode(response, content, state)
 
     async def generate(self, shape: ShapeRequest) -> ShapeResult:
         body, key = self._shape(shape)

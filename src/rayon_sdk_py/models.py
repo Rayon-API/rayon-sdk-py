@@ -95,5 +95,5 @@ class ShapeResult:
     request_id: str
     generation_ms: int
     profile_used: dict[str, Any] = field(repr=False)
-    material_ref: str | None = field(default=None, repr=False)
-    material_expires_at: str | None = None
+    material_ref: str = field(repr=False)
+    material_expires_at: str

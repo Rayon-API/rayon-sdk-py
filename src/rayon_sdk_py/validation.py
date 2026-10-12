@@ -105,6 +105,90 @@ def byte_size(value):
     )
 
 
+DEFAULT_PROFILE = {
+    "user_agent": "Mozilla/5.0",
+    "platform": "MacIntel",
+    "language": "en-US",
+    "languages": ["en-US", "en"],
+    "screen": {
+        "width": 1920,
+        "height": 1080,
+        "availWidth": 1920,
+        "availHeight": 1040,
+        "colorDepth": 24,
+        "pixelDepth": 24,
+    },
+    "window": {
+        "innerWidth": 1920,
+        "innerHeight": 1040,
+        "outerWidth": 1920,
+        "outerHeight": 1080,
+        "devicePixelRatio": 1.0,
+        "screenX": 0,
+        "screenY": 0,
+        "screenLeft": 0,
+        "screenTop": 0,
+        "pageXOffset": 0,
+        "pageYOffset": 0,
+    },
+    "webgl": {"renderer": "Sandbox Renderer", "vendor": "Google Inc."},
+    "canvas": {
+        "data_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII="
+    },
+    "navigator": {
+        "userAgent": "Mozilla/5.0",
+        "platform": "MacIntel",
+        "vendor": "Google Inc.",
+        "appVersion": "5.0",
+        "appCodeName": "Mozilla",
+        "appName": "Netscape",
+        "product": "Gecko",
+        "language": "en-US",
+        "languages": ["en-US", "en"],
+        "hardwareConcurrency": 8,
+        "maxTouchPoints": 0,
+        "webdriver": False,
+        "cookieEnabled": True,
+        "doNotTrack": None,
+    },
+}
+
+
+def effective_profile(profile):
+    """Measure the canonical browser identity, including defaults and aliases."""
+    effective = json_copy(DEFAULT_PROFILE)
+    for key, value in profile.items():
+        if isinstance(value, dict):
+            effective[key].update(value)
+        else:
+            effective[key] = value
+    navigator = effective["navigator"]
+    supplied_navigator = profile.get("navigator", {})
+    for top, alias in [
+        ("user_agent", "userAgent"),
+        ("platform", "platform"),
+        ("language", "language"),
+        ("languages", "languages"),
+    ]:
+        value = (
+            supplied_navigator[alias] if alias in supplied_navigator else effective[top]
+        )
+        effective[top] = value
+        navigator[alias] = value
+    if "appVersion" not in supplied_navigator:
+        navigator["appVersion"] = re.sub(r"^Mozilla/", "", effective["user_agent"])
+    effective["window"]["devicePixelRatio"] = float(
+        effective["window"]["devicePixelRatio"]
+    )
+    return effective
+
+
+def effective_profile_size(profile):
+    return len(
+        json.dumps(effective_profile(profile), ensure_ascii=False).encode("utf-8")
+    )
+
+
 def profile_valid(profile):
     fields = {
         "user_agent": str,
@@ -229,6 +313,17 @@ def profile_valid(profile):
             "outerWidth": (1, 32768),
             "outerHeight": (1, 32768),
             "devicePixelRatio": (0.1, 16),
+            **dict.fromkeys(
+                (
+                    "screenX",
+                    "screenY",
+                    "screenLeft",
+                    "screenTop",
+                    "pageXOffset",
+                    "pageYOffset",
+                ),
+                (-2147483648, 2147483647),
+            ),
         },
         "navigator": {"hardwareConcurrency": (1, 1024), "maxTouchPoints": (0, 100)},
     }.items():
@@ -283,7 +378,10 @@ def validate_shape(value):
             r"[A-Za-z0-9_-]{16,128}", v["material_ref"]
         ):
             raise ValueError
-        if not profile_valid(v["profile"]) or byte_size(v["profile"]) > 64 * 1024:
+        if (
+            not profile_valid(v["profile"])
+            or effective_profile_size(v["profile"]) > 64 * 1024
+        ):
             raise ValueError
         r = v["request"]
         if (
@@ -394,11 +492,13 @@ def parse_result(body, metadata, api_key):
         families = []
         suffixes = []
         for name, value in headers.items():
-            m = re.fullmatch(r"([!#$%&'*+\-.^_`|~0-9A-Za-z]+)-([abcdfz])", name, re.I)
+            m = re.fullmatch(
+                r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-([abcdfz])", name, re.I
+            )
             if (
                 not m
                 or not isinstance(value, str)
-                or any(ord(c) < 32 or ord(c) == 127 or ord(c) > 255 for c in value)
+                or any(not 33 <= ord(c) <= 126 for c in value)
                 or (m[2].lower() != "d" and not value.strip())
             ):
                 raise ValueError
@@ -408,7 +508,7 @@ def parse_result(body, metadata, api_key):
             raise ValueError
         ref = v.get("material_ref")
         expiry = v.get("material_expires_at")
-        if (ref is None) != (expiry is None):
+        if ref is None or expiry is None:
             raise ValueError
         if ref is not None:
             if (

@@ -397,3 +397,150 @@ def test_real_sync_async_transport_compression_deadline_and_limits():
         server.shutdown()
         server.server_close()
         thread.join()
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["screenX", "screenY", "screenLeft", "screenTop", "pageXOffset", "pageYOffset"],
+)
+@pytest.mark.parametrize("value", [-2147483649, 2147483648])
+def test_window_coordinates_reject_int32_overflow(transport, field, value):
+    with pytest.raises(sdk.ValidationError):
+        sdk.generate(shape(profile={"window": {field: value}}), KEY)
+    assert not transport["calls"]
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"material_ref": None, "material_expires_at": None},
+        {"material_ref": None},
+        {"material_expires_at": None},
+    ],
+)
+def test_material_metadata_required_not_null(transport, change):
+    transport["body"] = result(**change)
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.generate(shape(), KEY)
+
+
+@pytest.mark.parametrize("field", ["material_ref", "material_expires_at"])
+def test_material_metadata_required_not_missing(transport, field):
+    del transport["body"][field]
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.generate(shape(), KEY)
+
+
+def test_material_metadata_pair_cannot_both_be_missing(transport):
+    del transport["body"]["material_ref"]
+    del transport["body"]["material_expires_at"]
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.generate(shape(), KEY)
+
+
+@pytest.mark.parametrize(
+    "prefix,value", [("p" * 129, "valid"), ("valid", "é"), ("valid", "a b")]
+)
+def test_headers_require_bounded_prefix_visible_ascii(transport, prefix, value):
+    transport["body"] = result(
+        headers={
+            f"{prefix}-{suffix}": "" if suffix == "d" else value for suffix in "abcdfz"
+        }
+    )
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.generate(shape(), KEY)
+
+
+def test_effective_profile_size_accounts_for_defaults_and_aliases(transport):
+    profile = {
+        "user_agent": "u" * 8192,
+        "platform": "p" * 8192,
+        "language": "l" * 8192,
+        "languages": ["a" * 8192, "b" * 8192, "c" * 8192],
+    }
+    with pytest.raises(sdk.ValidationError):
+        sdk.generate(shape(profile=profile), KEY)
+    assert not transport["calls"]
+
+
+def test_unicode_profile_limit_counts_effective_utf8(transport):
+    profile = {"navigator": {"vendor": "é" * 8192, "appName": "é" * 8192}}
+    sdk.generate(shape(profile=profile), KEY)
+    assert transport["calls"][0][2]["json"]["profile"] == profile
+
+
+def test_async_deadline_includes_waiting_for_pool_capacity():
+    import threading, time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"{")
+            self.wfile.flush()
+            time.sleep(0.4)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    async def run():
+        async with sdk.AsyncClient(
+            KEY, base_url=f"http://127.0.0.1:{server.server_port}", timeout=0.1
+        ) as client:
+            started = time.monotonic()
+
+            async def call():
+                with pytest.raises(sdk.TransportError):
+                    await client.generate(shape())
+                return time.monotonic() - started
+
+            elapsed = await asyncio.gather(*(call() for _ in range(21)))
+            assert max(elapsed) < 0.22, elapsed
+
+    try:
+        asyncio.run(run())
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+
+
+def test_shared_canonical_profile_fixtures(transport):
+    from pathlib import Path
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures/profile-contract.json").read_text()
+    )
+
+    def expand(value):
+        if isinstance(value, dict) and "$repeat" in value:
+            return value["$repeat"]["text"] * value["$repeat"]["count"]
+        if isinstance(value, dict):
+            return {key: expand(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [expand(item) for item in value]
+        return value
+
+    for case in fixture["cases"]:
+        value = shape(profile=expand(case["profile"]))
+        if case["valid"]:
+            sdk.generate(value, KEY)
+        else:
+            with pytest.raises(sdk.ValidationError):
+                sdk.generate(value, KEY)
+
+
+@pytest.mark.parametrize("prefix", ["ee30zvqlwf", "p" * 128, "!#$%&'*+-.^_`|~"])
+def test_actual_token_prefix_and_maximum_are_preserved(transport, prefix):
+    headers = {
+        f"{prefix}-{suffix}": "" if suffix == "d" else "visible-value"
+        for suffix in "abcdfz"
+    }
+    transport["body"] = result(headers=headers)
+    assert sdk.generate(shape(), KEY).headers == headers

@@ -1,0 +1,274 @@
+{
+  "defaults": {
+    "user_agent": "Mozilla/5.0",
+    "platform": "MacIntel",
+    "language": "en-US",
+    "languages": [
+      "en-US",
+      "en"
+    ],
+    "screen": {
+      "width": 1920,
+      "height": 1080,
+      "availWidth": 1920,
+      "availHeight": 1040,
+      "colorDepth": 24,
+      "pixelDepth": 24
+    },
+    "window": {
+      "innerWidth": 1920,
+      "innerHeight": 1040,
+      "outerWidth": 1920,
+      "outerHeight": 1080,
+      "devicePixelRatio": 1.0,
+      "screenX": 0,
+      "screenY": 0,
+      "screenLeft": 0,
+      "screenTop": 0,
+      "pageXOffset": 0,
+      "pageYOffset": 0
+    },
+    "webgl": {
+      "renderer": "Sandbox Renderer",
+      "vendor": "Google Inc."
+    },
+    "canvas": {
+      "data_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII="
+    },
+    "navigator": {
+      "userAgent": "Mozilla/5.0",
+      "platform": "MacIntel",
+      "vendor": "Google Inc.",
+      "appVersion": "5.0",
+      "appCodeName": "Mozilla",
+      "appName": "Netscape",
+      "product": "Gecko",
+      "language": "en-US",
+      "languages": [
+        "en-US",
+        "en"
+      ],
+      "hardwareConcurrency": 8,
+      "maxTouchPoints": 0,
+      "webdriver": false,
+      "cookieEnabled": true,
+      "doNotTrack": null
+    }
+  },
+  "cases": [
+    {
+      "name": "defaults",
+      "profile": {},
+      "valid": true,
+      "effective_utf8_bytes": 993
+    },
+    {
+      "name": "navigator-aliases",
+      "profile": {
+        "navigator": {
+          "userAgent": "Mozilla/5.0 Custom",
+          "platform": "Linux",
+          "language": "fr",
+          "languages": [
+            "fr"
+          ]
+        }
+      },
+      "valid": true,
+      "effective_utf8_bytes": 984
+    },
+    {
+      "name": "unicode",
+      "profile": {
+        "navigator": {
+          "vendor": {
+            "$repeat": {
+              "text": "é",
+              "count": 8192
+            }
+          },
+          "appName": {
+            "$repeat": {
+              "text": "é",
+              "count": 8192
+            }
+          }
+        }
+      },
+      "valid": true,
+      "effective_utf8_bytes": 33742
+    },
+    {
+      "name": "expanded-over-limit",
+      "profile": {
+        "user_agent": {
+          "$repeat": {
+            "text": "u",
+            "count": 8192
+          }
+        },
+        "platform": {
+          "$repeat": {
+            "text": "p",
+            "count": 8192
+          }
+        },
+        "language": {
+          "$repeat": {
+            "text": "l",
+            "count": 8192
+          }
+        },
+        "languages": [
+          {
+            "$repeat": {
+              "text": "a",
+              "count": 8192
+            }
+          },
+          {
+            "$repeat": {
+              "text": "b",
+              "count": 8192
+            }
+          },
+          {
+            "$repeat": {
+              "text": "c",
+              "count": 8192
+            }
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "coordinate-min-max",
+      "profile": {
+        "window": {
+          "screenX": -2147483648,
+          "pageYOffset": 2147483647
+        }
+      },
+      "valid": true,
+      "effective_utf8_bytes": 1012
+    },
+    {
+      "name": "effective-boundary",
+      "profile": {
+        "navigator": {
+          "vendor": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "appName": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "appCodeName": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "product": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "appVersion": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "doNotTrack": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          }
+        },
+        "webgl": {
+          "renderer": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "vendor": {
+            "$repeat": {
+              "text": "x",
+              "count": 7262
+            }
+          }
+        }
+      },
+      "valid": true,
+      "effective_utf8_bytes": 65536
+    },
+    {
+      "name": "effective-boundary-over",
+      "profile": {
+        "navigator": {
+          "vendor": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "appName": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "appCodeName": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "product": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "appVersion": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "doNotTrack": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          }
+        },
+        "webgl": {
+          "renderer": {
+            "$repeat": {
+              "text": "x",
+              "count": 8192
+            }
+          },
+          "vendor": {
+            "$repeat": {
+              "text": "x",
+              "count": 7263
+            }
+          }
+        }
+      },
+      "valid": false
+    }
+  ]
+}
