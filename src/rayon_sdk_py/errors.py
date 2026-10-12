@@ -4,8 +4,14 @@ from .models import SolveResult
 class RayonError(Exception):
     """Base class for all SDK failures; messages never include API response bodies."""
 
-    def __init__(self, message: str, *, status_code: int | None = None,
-                 request_id: str | None = None, retry_after: str | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        request_id: str | None = None,
+        retry_after: str | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.request_id = request_id

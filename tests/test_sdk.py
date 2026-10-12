@@ -14,9 +14,18 @@ def accepted(**changes):
         "method": "playwright",
         "target_url": TARGET,
         "duration_ms": 123,
-        "headers": {f"X-RandomPrefix-{suffix}": "" if suffix == "d" else f"secret-{suffix}"
-                    for suffix in "abcdfz"},
-        "cookies": [{"name": "session", "value": "cookie-secret", "domain": ".example.com", "path": "/page"}],
+        "headers": {
+            f"X-RandomPrefix-{suffix}": "" if suffix == "d" else f"secret-{suffix}"
+            for suffix in "abcdfz"
+        },
+        "cookies": [
+            {
+                "name": "session",
+                "value": "cookie-secret",
+                "domain": ".example.com",
+                "path": "/page",
+            }
+        ],
         "profile_used": {"user_agent": "profile-secret"},
         "errors": ["Earlier tier failed"],
     }
@@ -107,38 +116,80 @@ def test_defaults_omit_profile_and_custom_base_is_supported(sdk, transport):
 
 def test_result_repr_hides_replay_credentials(sdk, transport):
     result = sdk.solve(TARGET, KEY)
-    assert all(secret not in repr(result) for secret in (KEY, "cookie-secret", "profile-secret", "secret-a"))
+    assert all(
+        secret not in repr(result)
+        for secret in (KEY, "cookie-secret", "profile-secret", "secret-a")
+    )
 
 
-@pytest.mark.parametrize("target", [None, "", "ftp://example.com", "https:///page", "https://u:p@example.com", "https://example.com\n", "https://example.com:bad", "https://example.com/#fragment"])
+@pytest.mark.parametrize(
+    "target",
+    [
+        None,
+        "",
+        "ftp://example.com",
+        "https:///page",
+        "https://u:p@example.com",
+        "https://example.com\n",
+        "https://example.com:bad",
+        "https://example.com/#fragment",
+    ],
+)
 def test_invalid_target_never_reaches_network(sdk, transport, target):
     with pytest.raises(sdk.ValidationError):
         sdk.solve(target, KEY)
     assert not transport["calls"]
 
 
-@pytest.mark.parametrize("key", [None, "", " ", "key\r\nx: value", "key with space", "é"])
+@pytest.mark.parametrize(
+    "key", [None, "", " ", "key\r\nx: value", "key with space", "é"]
+)
 def test_invalid_api_key_never_reaches_network(sdk, transport, key):
     with pytest.raises(sdk.ValidationError):
         sdk.solve(TARGET, key)
     assert not transport["calls"]
 
 
-@pytest.mark.parametrize("timeout", [0, -1, float("inf"), float("nan"), None, True, "10"])
+@pytest.mark.parametrize(
+    "timeout", [0, -1, float("inf"), float("nan"), None, True, "10"]
+)
 def test_invalid_timeout_never_reaches_network(sdk, transport, timeout):
     with pytest.raises(sdk.ValidationError):
         sdk.solve(TARGET, KEY, timeout=timeout)
     assert not transport["calls"]
 
 
-@pytest.mark.parametrize("base", [None, "", "ftp://example.com", "http://example.com", "https://u:p@example.com", "https://example.com?key=secret", "https://example.com#fragment", "https://example.com\t", "https://example.com:bad"])
+@pytest.mark.parametrize(
+    "base",
+    [
+        None,
+        "",
+        "ftp://example.com",
+        "http://example.com",
+        "https://u:p@example.com",
+        "https://example.com?key=secret",
+        "https://example.com#fragment",
+        "https://example.com\t",
+        "https://example.com:bad",
+    ],
+)
 def test_invalid_base_url_never_reaches_network(sdk, transport, base):
     with pytest.raises(sdk.ValidationError):
         sdk.solve(TARGET, KEY, base_url=base)
     assert not transport["calls"]
 
 
-@pytest.mark.parametrize("profile", [[], {"bad": object()}, {"bad": float("nan")}, {"profile": "bad"}, {1: "bad"}, {"nested": {1: "bad"}}])
+@pytest.mark.parametrize(
+    "profile",
+    [
+        [],
+        {"bad": object()},
+        {"bad": float("nan")},
+        {"profile": "bad"},
+        {1: "bad"},
+        {"nested": {1: "bad"}},
+    ],
+)
 def test_invalid_profile_never_reaches_network(sdk, transport, profile):
     with pytest.raises(sdk.ValidationError):
         sdk.solve(TARGET, KEY, profile=profile)
@@ -147,7 +198,9 @@ def test_invalid_profile_never_reaches_network(sdk, transport, profile):
 
 @pytest.mark.parametrize("status", [401, 403, 422, 429, 503])
 def test_http_errors_are_safe_and_expose_diagnostics(sdk, transport, status):
-    transport["response"] = Response({"secret": KEY}, status, {"X-Request-ID": "req-123", "Retry-After": "30"})
+    transport["response"] = Response(
+        {"secret": KEY}, status, {"X-Request-ID": "req-123", "Retry-After": "30"}
+    )
     with pytest.raises(sdk.HTTPError) as caught:
         sdk.solve(TARGET, KEY)
     error = caught.value
@@ -160,7 +213,9 @@ def test_http_errors_are_safe_and_expose_diagnostics(sdk, transport, status):
 
 @pytest.mark.parametrize("status", [301, 302, 307, 308])
 def test_redirects_are_typed_and_not_followed(sdk, transport, status):
-    transport["response"] = Response(status=status, headers={"Location": f"https://example.com/{KEY}"})
+    transport["response"] = Response(
+        status=status, headers={"Location": f"https://example.com/{KEY}"}
+    )
     with pytest.raises(sdk.RedirectError) as caught:
         sdk.solve(TARGET, KEY)
     assert caught.value.status_code == status
@@ -169,7 +224,9 @@ def test_redirects_are_typed_and_not_followed(sdk, transport, status):
 
 
 def test_network_failure_is_typed_safe_and_not_retried(sdk, transport):
-    transport["exception"] = requests.exceptions.RequestException(f"Authorization: {KEY}")
+    transport["exception"] = requests.exceptions.RequestException(
+        f"Authorization: {KEY}"
+    )
     with pytest.raises(sdk.TransportError) as caught:
         sdk.solve(TARGET, KEY)
     assert KEY not in str(caught.value) + repr(caught.value)
@@ -189,16 +246,55 @@ def test_invalid_json_is_typed_safe(sdk, transport, failure):
 def test_cookie_scope_and_extra_metadata_are_preserved(sdk, transport):
     cookies = [
         {"name": "session", "value": "first", "domain": "example.com", "path": "/"},
-        {"name": "session", "value": "second", "domain": ".example.com", "path": "/page", "future": {"flag": True}},
+        {
+            "name": "session",
+            "value": "second",
+            "domain": ".example.com",
+            "path": "/page",
+            "future": {"flag": True},
+        },
     ]
     transport["response"] = Response(accepted(cookies=cookies))
     result = sdk.solve(TARGET, KEY)
     assert result.cookies == cookies
-    assert all("secure" not in cookie and "expiry" not in cookie for cookie in result.cookies)
+    assert all(
+        "secure" not in cookie and "expiry" not in cookie for cookie in result.cookies
+    )
 
 
 def test_header_family_is_case_insensitive_and_prefix_is_variable(sdk, transport):
-    headers = {f"Telemetry_9-{suffix}": "" if suffix == "D" else "value" for suffix in "ABCDfZ"}
+    headers = {
+        f"Telemetry_9-{suffix}": "" if suffix == "D" else "value" for suffix in "ABCDfZ"
+    }
+    transport["response"] = Response(accepted(headers=headers))
+    assert sdk.solve(TARGET, KEY).headers == headers
+
+
+@pytest.mark.parametrize("value", ["value\u0100", "value\u20ac", "value\U0001f680"])
+def test_response_headers_reject_characters_outside_latin1(sdk, transport, value):
+    headers = {**accepted()["headers"], "X-RandomPrefix-a": value}
+    transport["response"] = Response(accepted(headers=headers))
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.solve(TARGET, KEY)
+
+
+def test_response_headers_allow_latin1_values(sdk, transport):
+    headers = {**accepted()["headers"], "X-RandomPrefix-a": "value\u00e9"}
+    transport["response"] = Response(accepted(headers=headers))
+    assert sdk.solve(TARGET, KEY).headers == headers
+
+
+@pytest.mark.parametrize("prefix", ["X-\u212a", "X-\u0130"])
+def test_response_header_names_reject_unicode_casefold_matches(sdk, transport, prefix):
+    headers = {f"{prefix}-{suffix}": "value" for suffix in "abcdfz"}
+    transport["response"] = Response(accepted(headers=headers))
+    with pytest.raises(sdk.InvalidResponseError):
+        sdk.solve(TARGET, KEY)
+
+
+def test_header_family_has_no_arbitrary_field_length_limits(sdk, transport):
+    prefix = "X-" + "P" * 300
+    headers = {f"{prefix}-{suffix}": "value" * 4000 for suffix in "abcdfz"}
     transport["response"] = Response(accepted(headers=headers))
     assert sdk.solve(TARGET, KEY).headers == headers
 
@@ -221,17 +317,28 @@ def test_nonaccepted_200_throws_solve_failure(sdk, transport, status):
     assert KEY not in str(caught.value) + repr(caught.value) + repr(caught.value.result)
 
 
-@pytest.mark.parametrize("changes", [
-    {"status": "unexpected"}, {"method": "none"}, {"target_url": "https://different.example/"},
-    {"duration_ms": -1}, {"duration_ms": True}, {"duration_ms": 1.5},
-    {"headers": {"X-Prefix-a": "a"}}, {"headers": {f"X-Prefix-{s}": "" for s in "abcdfz"}},
-    {"headers": {**accepted()["headers"], "X-Other-a": "a"}},
-    {"headers": {**accepted()["headers"], "X-RandomPrefix-a": 1}},
-    {"headers": {**accepted()["headers"], "X-RandomPrefix-a": "a\r\nBad: value"}},
-    {"cookies": {}}, {"cookies": [{"name": "n", "value": "v"}]},
-    {"cookies": [{"name": "n", "value": 1, "domain": "example.com", "path": "/"}]},
-    {"profile_used": []}, {"errors": "error"}, {"errors": [1]},
-])
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"status": "unexpected"},
+        {"method": "none"},
+        {"target_url": "https://different.example/"},
+        {"duration_ms": -1},
+        {"duration_ms": True},
+        {"duration_ms": 1.5},
+        {"headers": {"X-Prefix-a": "a"}},
+        {"headers": {f"X-Prefix-{s}": "" for s in "abcdfz"}},
+        {"headers": {**accepted()["headers"], "X-Other-a": "a"}},
+        {"headers": {**accepted()["headers"], "X-RandomPrefix-a": 1}},
+        {"headers": {**accepted()["headers"], "X-RandomPrefix-a": "a\r\nBad: value"}},
+        {"cookies": {}},
+        {"cookies": [{"name": "n", "value": "v"}]},
+        {"cookies": [{"name": "n", "value": 1, "domain": "example.com", "path": "/"}]},
+        {"profile_used": []},
+        {"errors": "error"},
+        {"errors": [1]},
+    ],
+)
 def test_malformed_response_is_rejected(sdk, transport, changes):
     transport["response"] = Response(accepted(**changes))
     with pytest.raises(sdk.InvalidResponseError):
@@ -246,7 +353,9 @@ def test_missing_response_fields_are_not_synthesized(sdk, transport):
         sdk.solve(TARGET, KEY)
 
 
-def test_actual_curl_adapter_disables_environment_proxy_without_network(sdk, monkeypatch):
+def test_actual_curl_adapter_disables_environment_proxy_without_network(
+    sdk, monkeypatch
+):
     from curl_cffi import Curl, CurlError, CurlOpt
 
     options = []
@@ -269,13 +378,22 @@ def test_actual_curl_adapter_disables_environment_proxy_without_network(sdk, mon
     assert (CurlOpt.FOLLOWLOCATION, 0) in options
 
 
-@pytest.mark.parametrize("request_id,retry_after", [
-    (KEY, KEY), ("prefix-" + KEY, "30\r\nBad: value"),
-    ("x" * 129, "99999999999"), ("id\nsecret", "tomorrow"),
-    ("Bearer secret", "Fri, 99 Oct 2026 00:00:00 GMT"),
-])
-def test_http_diagnostics_drop_reflected_credentials_and_invalid_headers(sdk, transport, request_id, retry_after):
-    transport["response"] = Response(status=429, headers={"X-Request-ID": request_id, "Retry-After": retry_after})
+@pytest.mark.parametrize(
+    "request_id,retry_after",
+    [
+        (KEY, KEY),
+        ("prefix-" + KEY, "30\r\nBad: value"),
+        ("x" * 129, "99999999999"),
+        ("id\nsecret", "tomorrow"),
+        ("Bearer secret", "Fri, 99 Oct 2026 00:00:00 GMT"),
+    ],
+)
+def test_http_diagnostics_drop_reflected_credentials_and_invalid_headers(
+    sdk, transport, request_id, retry_after
+):
+    transport["response"] = Response(
+        status=429, headers={"X-Request-ID": request_id, "Retry-After": retry_after}
+    )
     with pytest.raises(sdk.HTTPError) as caught:
         sdk.solve(TARGET, KEY)
     assert caught.value.request_id is None
@@ -292,14 +410,21 @@ def test_valid_http_date_retry_after_is_preserved(sdk, transport):
 
 
 def test_oversized_decoded_response_aborts_before_collecting_more(sdk, transport):
-    transport["chunks"] = [b'x' * (1024 * 1024), b'y' * (1024 * 1024), b'z', KEY.encode()]
+    transport["chunks"] = [
+        b"x" * (1024 * 1024),
+        b"y" * (1024 * 1024),
+        b"z",
+        KEY.encode(),
+    ]
     with pytest.raises(sdk.InvalidResponseError) as caught:
         sdk.solve(TARGET, KEY)
     assert transport.get("aborted") is True
     assert KEY not in str(caught.value)
 
 
-def test_actual_adapter_body_callback_limits_decoded_bytes_and_preserves_timeout(sdk, monkeypatch):
+def test_actual_adapter_body_callback_limits_decoded_bytes_and_preserves_timeout(
+    sdk, monkeypatch
+):
     from curl_cffi import Curl, CurlError, CurlOpt
 
     options = {}
@@ -312,7 +437,7 @@ def test_actual_adapter_body_callback_limits_decoded_bytes_and_preserves_timeout
     def perform(curl):
         callback = options.get(CurlOpt.WRITEFUNCTION)
         if callable(callback):
-            assert callback(b'x' * (2 * 1024 * 1024)) == 2 * 1024 * 1024
+            assert callback(b"x" * (2 * 1024 * 1024)) == 2 * 1024 * 1024
             assert callback(KEY.encode()) != len(KEY)
         raise CurlError("Write aborted: " + KEY, code=23)
 
