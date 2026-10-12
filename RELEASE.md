@@ -1,9 +1,8 @@
 # Release checklist
 
-The package has not been published to PyPI. Registry availability and the GitHub
-repository must be checked before the first release.
+Check registry availability and repository ownership before the first release.
 
-Create the GitHub repository `Rayon-API/rayon-sdk-py` and a GitHub Actions
+Use the GitHub repository `Rayon-API/rayon-sdk-py` and a GitHub Actions
 environment named `pypi`. Configure appropriate release reviewer permissions.
 
 On [PyPI's pending publisher page](https://pypi.org/manage/account/publishing/),
@@ -29,7 +28,7 @@ with OpenID Connect. No stored PyPI token is required.
    Creating a published release runs `.github/workflows/publish.yml`; drafts do not.
 5. The workflow checks tag/version agreement, tests all three Python versions,
    builds and checks distributions, then publishes through the `pypi` environment.
-6. Verify the PyPI project and installation, then update README release status.
+6. Verify the PyPI project and installation.
 
 PyPI versions cannot be overwritten. If a released package needs correction,
 increment the version and publish a new release.

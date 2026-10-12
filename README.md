@@ -2,14 +2,7 @@
 
 A synchronous client for `POST /solve` on the Rayon API. Python 3.10 or newer is required.
 
-Version `0.1.0` is prepared locally; it has **not yet been published to PyPI**.
-From a checkout, install with:
-
-```sh
-python -m pip install .
-```
-
-After the first PyPI release, installation will be:
+Install from PyPI:
 
 ```sh
 python -m pip install rayon-sdk-py
@@ -107,4 +100,4 @@ python -m twine check dist/*
 
 Tests are offline and patch the transport. CI tests Python 3.10, 3.12, and 3.14
 and builds the wheel and source distribution. See [RELEASE.md](RELEASE.md) for
-the pending trusted publisher setup. Licensed under [MIT](LICENSE).
+the trusted publisher setup. Licensed under [MIT](LICENSE).
