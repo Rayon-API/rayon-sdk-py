@@ -62,6 +62,11 @@ def transport(monkeypatch):
             state["calls"].append((url, options))
             if "exception" in state:
                 raise state["exception"]
+            for chunk in state.get("chunks", []):
+                callback = options.get("content_callback")
+                if callback is not None and callback(chunk) != len(chunk):
+                    state["aborted"] = True
+                    raise requests.exceptions.RequestException("Body callback aborted")
             return state["response"]
 
     monkeypatch.setattr(requests, "Session", Session)
@@ -262,3 +267,90 @@ def test_actual_curl_adapter_disables_environment_proxy_without_network(sdk, mon
         sdk.solve(TARGET, KEY)
     assert (CurlOpt.PROXY, "") in options
     assert (CurlOpt.FOLLOWLOCATION, 0) in options
+
+
+@pytest.mark.parametrize("request_id,retry_after", [
+    (KEY, KEY), ("prefix-" + KEY, "30\r\nBad: value"),
+    ("x" * 129, "99999999999"), ("id\nsecret", "tomorrow"),
+    ("Bearer secret", "Fri, 99 Oct 2026 00:00:00 GMT"),
+])
+def test_http_diagnostics_drop_reflected_credentials_and_invalid_headers(sdk, transport, request_id, retry_after):
+    transport["response"] = Response(status=429, headers={"X-Request-ID": request_id, "Retry-After": retry_after})
+    with pytest.raises(sdk.HTTPError) as caught:
+        sdk.solve(TARGET, KEY)
+    assert caught.value.request_id is None
+    assert caught.value.retry_after is None
+    assert KEY not in str(caught.value.__dict__)
+
+
+def test_valid_http_date_retry_after_is_preserved(sdk, transport):
+    value = "Mon, 12 Oct 2026 10:00:00 GMT"
+    transport["response"] = Response(status=429, headers={"Retry-After": value})
+    with pytest.raises(sdk.HTTPError) as caught:
+        sdk.solve(TARGET, KEY)
+    assert caught.value.retry_after == value
+
+
+def test_oversized_decoded_response_aborts_before_collecting_more(sdk, transport):
+    transport["chunks"] = [b'x' * (1024 * 1024), b'y' * (1024 * 1024), b'z', KEY.encode()]
+    with pytest.raises(sdk.InvalidResponseError) as caught:
+        sdk.solve(TARGET, KEY)
+    assert transport.get("aborted") is True
+    assert KEY not in str(caught.value)
+
+
+def test_actual_adapter_body_callback_limits_decoded_bytes_and_preserves_timeout(sdk, monkeypatch):
+    from curl_cffi import Curl, CurlError, CurlOpt
+
+    options = {}
+    original = Curl.setopt
+
+    def setopt(curl, option, value):
+        options[option] = value
+        return original(curl, option, value)
+
+    def perform(curl):
+        callback = options.get(CurlOpt.WRITEFUNCTION)
+        if callable(callback):
+            assert callback(b'x' * (2 * 1024 * 1024)) == 2 * 1024 * 1024
+            assert callback(KEY.encode()) != len(KEY)
+        raise CurlError("Write aborted: " + KEY, code=23)
+
+    monkeypatch.setattr(Curl, "setopt", setopt)
+    monkeypatch.setattr(Curl, "perform", perform)
+    with pytest.raises(sdk.InvalidResponseError) as caught:
+        sdk.solve(TARGET, KEY)
+    assert callable(options[CurlOpt.WRITEFUNCTION])
+    assert options[CurlOpt.TIMEOUT_MS] == 150_000
+    assert KEY not in str(caught.value)
+
+
+def test_actual_adapter_parses_json_from_multiple_decoded_chunks(sdk, monkeypatch):
+    import json
+    from curl_cffi import Curl, CurlOpt
+
+    options = {}
+    original = Curl.setopt
+    payload = json.dumps(accepted()).encode()
+
+    def setopt(curl, option, value):
+        options[option] = value
+        return original(curl, option, value)
+
+    def perform(curl):
+        callback = options[CurlOpt.WRITEFUNCTION]
+        assert callback(payload[:30]) == 30
+        assert callback(payload[30:]) == len(payload) - 30
+
+    def parse_response(*args, **kwargs):
+        response = requests.Response()
+        response.status_code = 200
+        response.headers = requests.Headers({"X-Request-ID": "req-123"})
+        return response
+
+    monkeypatch.setattr(Curl, "setopt", setopt)
+    monkeypatch.setattr(Curl, "perform", perform)
+    monkeypatch.setattr(requests.Session, "_parse_response", parse_response)
+    result = sdk.solve(TARGET, KEY)
+    assert result.headers == accepted()["headers"]
+    assert result.cookies == accepted()["cookies"]

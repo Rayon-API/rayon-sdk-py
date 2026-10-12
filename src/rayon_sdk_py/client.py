@@ -1,8 +1,12 @@
 from curl_cffi import CurlOpt, requests
+from curl_cffi.curl import CURL_WRITEFUNC_ERROR
 
 from .errors import HTTPError, InvalidResponseError, RedirectError, SolveFailedError, TransportError
 from .models import SolveResult
-from .validation import parse_result, validate_request
+from .validation import parse_result, response_metadata, validate_request
+
+
+_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 
 
 def solve(
@@ -18,6 +22,17 @@ def solve(
     body = {"target_url": target_url}
     if profile is not None:
         body["profile"] = profile
+    content = bytearray()
+    oversized = False
+
+    def collect(chunk):
+        nonlocal oversized
+        if len(content) + len(chunk) > _MAX_RESPONSE_BYTES:
+            oversized = True
+            return CURL_WRITEFUNC_ERROR
+        content.extend(chunk)
+        return len(chunk)
+
     try:
         # Some curl_cffi versions leave libcurl's environment proxy lookup enabled.
         with requests.Session(impersonate="chrome", trust_env=False, curl_options={CurlOpt.PROXY: ""}) as session:
@@ -27,14 +42,14 @@ def solve(
                 headers={"Authorization": f"Bearer {api_key}"},
                 timeout=timeout,
                 allow_redirects=False,
+                    content_callback=collect,
             )
     except requests.exceptions.RequestException:
+        if oversized:
+            raise InvalidResponseError("Rayon API response exceeded the 2 MiB limit.") from None
         raise TransportError("Rayon API request could not be completed.") from None
-    metadata = {
-        "status_code": response.status_code,
-        "request_id": response.headers.get("X-Request-ID"),
-        "retry_after": response.headers.get("Retry-After"),
-    }
+    response.content = bytes(content)
+    metadata = response_metadata(response, api_key)
     if 300 <= response.status_code < 400:
         raise RedirectError("Rayon API returned a redirect; no redirect was followed.", **metadata)
     if response.status_code != 200:

@@ -31,6 +31,8 @@ print(result.status, result.method, result.duration_ms)
 `solve(target_url, api_key, *, profile=None, base_url="https://api.rayonapi.com", timeout=150)`
 performs one request using curl_cffi Chrome impersonation. Timeout is a finite positive
 number of seconds. The SDK disables redirects and environment proxies, and never retries.
+Decoded response bodies are limited to 2 MiB; larger responses stop the transfer
+and raise `InvalidResponseError`.
 Custom API endpoints require HTTPS; HTTP is supported only for `localhost`, `127.0.0.1`,
 or `[::1]` development endpoints. URLs cannot contain credentials or fragments;
 the API base URL also cannot contain a query.
@@ -87,7 +89,9 @@ network access; `TransportError` covers network failures; `RedirectError` is an
 `HTTPError`; `InvalidResponseError` covers invalid JSON or malformed responses.
 Exception messages do not include response bodies, credentials, or underlying
 transport messages. HTTP response errors expose `status_code`, `request_id`, and
-`retry_after` (the original header string, when present). Decide whether and when
+`retry_after` (a validated seconds or HTTP date header string, when present).
+Invalid diagnostic headers or values reflecting the API key are discarded.
+Decide whether and when
 to retry in your application; admitted solve attempts can consume quota.
 
 For local development:

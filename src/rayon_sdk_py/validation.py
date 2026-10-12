@@ -1,10 +1,29 @@
 import json
 import math
 import re
+from email.utils import format_datetime, parsedate_to_datetime
 from urllib.parse import urlsplit
 
 from .errors import InvalidResponseError, ValidationError
 from .models import SolveResult
+
+
+def response_metadata(response, api_key):
+    request_id = response.headers.get("X-Request-ID")
+    if (not isinstance(request_id, str) or api_key in request_id
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", request_id)):
+        request_id = None
+    retry_after = response.headers.get("Retry-After")
+    if not isinstance(retry_after, str) or api_key in retry_after or len(retry_after) > 128:
+        retry_after = None
+    elif not re.fullmatch(r"[0-9]{1,10}", retry_after):
+        try:
+            parsed = parsedate_to_datetime(retry_after)
+            if format_datetime(parsed, usegmt=True) != retry_after:
+                retry_after = None
+        except (ValueError, TypeError, OverflowError):
+            retry_after = None
+    return {"status_code": response.status_code, "request_id": request_id, "retry_after": retry_after}
 
 
 def _json_value(value, seen=None):
