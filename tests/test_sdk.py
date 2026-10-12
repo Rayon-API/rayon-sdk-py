@@ -544,3 +544,82 @@ def test_actual_token_prefix_and_maximum_are_preserved(transport, prefix):
     }
     transport["body"] = result(headers=headers)
     assert sdk.generate(shape(), KEY).headers == headers
+
+
+def test_sync_transport_error_does_not_retain_original_exception(transport):
+    transport["exception"] = requests.exceptions.RequestException(KEY)
+    with pytest.raises(sdk.TransportError) as caught:
+        sdk.generate(shape(), KEY)
+    assert caught.value.__context__ is None
+    assert caught.value.__cause__ is None
+
+
+def test_async_transport_error_does_not_retain_original_exception(transport):
+    transport["exception"] = requests.exceptions.RequestException(KEY)
+
+    async def run():
+        async with sdk.AsyncClient(KEY) as client:
+            with pytest.raises(sdk.TransportError) as caught:
+                await client.generate(shape())
+            assert caught.value.__context__ is None
+            assert caught.value.__cause__ is None
+
+    asyncio.run(run())
+
+
+def test_async_timeout_error_does_not_retain_cancelled_task(monkeypatch, transport):
+    import rayon_sdk_py.client as module
+
+    async def wait(*args, **kwargs):
+        await asyncio.sleep(1)
+
+    monkeypatch.setattr(requests.AsyncSession, "request", wait)
+
+    async def run():
+        async with sdk.AsyncClient(KEY, timeout=0.01) as client:
+            with pytest.raises(sdk.TransportError) as caught:
+                await client.generate(shape())
+            assert caught.value.__context__ is None
+            assert caught.value.__cause__ is None
+
+    asyncio.run(run())
+
+
+def test_public_profile_preflight_preserves_supplied_fields_and_copies():
+    profile = {"navigator": {"vendor": "😀" * 5000}, "window": {"screenX": -2147483648}}
+    checked = sdk.validate_profile(profile)
+    assert checked == profile
+    checked["navigator"]["vendor"] = "changed"
+    assert profile["navigator"]["vendor"] == "😀" * 5000
+    assert "user_agent" not in checked
+    with pytest.raises(sdk.ValidationError) as caught:
+        sdk.validate_profile({"window": {"screenX": 2147483648}})
+    assert caught.value.__context__ is None
+    assert caught.value.__cause__ is None
+
+
+def test_public_profile_preflight_matches_all_shared_cases():
+    from pathlib import Path
+
+    fixture = json.loads(
+        (Path(__file__).parent / "fixtures/profile-contract.json").read_text()
+    )
+
+    def expand(v):
+        if isinstance(v, dict) and "$repeat" in v:
+            return v["$repeat"]["text"] * v["$repeat"]["count"]
+        if isinstance(v, dict):
+            return {k: expand(item) for k, item in v.items()}
+        if isinstance(v, list):
+            return list(map(expand, v))
+        return v
+
+    for case in fixture["cases"]:
+        value = expand(case["profile"])
+        if case["valid"]:
+            assert sdk.validate_profile(value) == value
+        else:
+            with pytest.raises(sdk.ValidationError) as caught:
+                sdk.validate_profile(value)
+            assert caught.value.__context__ is None
+            assert caught.value.__cause__ is None

@@ -1,6 +1,7 @@
 """Material-only Rayon API clients."""
 
 from .client import Client, AsyncClient, generate
+from .validation import validate_profile
 from .models import (
     ShapeRequest,
     BrowserProfile,
@@ -23,6 +24,7 @@ __all__ = [
     "Client",
     "AsyncClient",
     "generate",
+    "validate_profile",
     "ShapeRequest",
     "BrowserProfile",
     "ShapeResult",

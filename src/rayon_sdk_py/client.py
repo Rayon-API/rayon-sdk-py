@@ -157,9 +157,12 @@ class Client(_BaseClient):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         options, content, state = self._options(body)
+        failed = False
         try:
             response = self._session.request(method, self._base_url + path, **options)
         except requests.exceptions.RequestException:
+            failed = True
+        if failed:
             self._failed(state)
         return self._decode(response, content, state)
 
@@ -221,10 +224,14 @@ class AsyncClient(_BaseClient):
                 raise asyncio.TimeoutError
             return decoded
 
+        failed = False
         try:
-            return await asyncio.wait_for(complete(), timeout=self._timeout)
+            decoded = await asyncio.wait_for(complete(), timeout=self._timeout)
         except (asyncio.TimeoutError, requests.exceptions.RequestException):
+            failed = True
+        if failed:
             self._failed(state)
+        return decoded
 
     async def generate(self, shape: ShapeRequest) -> ShapeResult:
         body, key = self._shape(shape)

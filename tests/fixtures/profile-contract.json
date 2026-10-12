@@ -269,6 +269,21 @@
         }
       },
       "valid": false
+    },
+    {
+      "name": "astral-unicode",
+      "profile": {
+        "navigator": {
+          "vendor": {
+            "$repeat": {
+              "text": "😀",
+              "count": 5000
+            }
+          }
+        }
+      },
+      "valid": true,
+      "effective_utf8_bytes": 20982
     }
   ]
 }

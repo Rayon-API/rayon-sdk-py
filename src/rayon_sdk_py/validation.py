@@ -5,7 +5,7 @@ from datetime import datetime
 from email.utils import format_datetime, parsedate_to_datetime
 from urllib.parse import urlsplit
 from .errors import InvalidResponseError, ValidationError
-from .models import ShapeResult
+from .models import BrowserProfile, ShapeResult
 
 MAX_RESPONSE_BYTES = 256 * 1024
 
@@ -340,6 +340,17 @@ def profile_valid(profile):
     return True
 
 
+def validate_profile(profile: BrowserProfile) -> BrowserProfile:
+    """Validate without network access; return a deep copy of supplied fields."""
+    try:
+        checked = json_copy(profile)
+        if profile_valid(checked) and effective_profile_size(checked) <= 64 * 1024:
+            return checked
+    except (ValueError, TypeError, RecursionError, OverflowError, UnicodeError):
+        pass
+    raise ValidationError("Invalid browser profile.")
+
+
 def validate_shape(value):
     try:
         v = json_copy(value)
@@ -378,11 +389,7 @@ def validate_shape(value):
             r"[A-Za-z0-9_-]{16,128}", v["material_ref"]
         ):
             raise ValueError
-        if (
-            not profile_valid(v["profile"])
-            or effective_profile_size(v["profile"]) > 64 * 1024
-        ):
-            raise ValueError
+        v["profile"] = validate_profile(v["profile"])
         r = v["request"]
         if (
             not isinstance(r, dict)
