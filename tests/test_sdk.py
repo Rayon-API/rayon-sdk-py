@@ -623,3 +623,29 @@ def test_public_profile_preflight_matches_all_shared_cases():
                 sdk.validate_profile(value)
             assert caught.value.__context__ is None
             assert caught.value.__cause__ is None
+
+
+@pytest.mark.parametrize("mode", ["client", "helper", "async"])
+@pytest.mark.parametrize("override", [None, 75])
+def test_generation_default_deadline_is_45_seconds_and_overrides_survive(
+    transport, mode, override
+):
+    options = {} if override is None else {"timeout": override}
+    if mode == "helper":
+        sdk.generate(shape(), KEY, **options)
+    elif mode == "client":
+        with sdk.Client(KEY, **options) as client:
+            client.generate(shape())
+            client.usage()
+    else:
+
+        async def run():
+            async with sdk.AsyncClient(KEY, **options) as client:
+                await client.generate(shape())
+                await client.usage()
+
+        asyncio.run(run())
+    assert all(
+        call[2]["timeout"] == (45 if override is None else override)
+        for call in transport["calls"]
+    )

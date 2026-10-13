@@ -25,7 +25,7 @@ from .validation import (
 
 
 class _BaseClient:
-    def __init__(self, api_key, *, base_url="https://api.rayonapi.com", timeout=150):
+    def __init__(self, api_key, *, base_url="https://api.rayonapi.com", timeout=45):
         connection(api_key, base_url, timeout)
         self._api_key = api_key
         self._base_url = base_url.rstrip("/")
@@ -132,7 +132,7 @@ class Client(_BaseClient):
         api_key: str,
         *,
         base_url: str = "https://api.rayonapi.com",
-        timeout: float = 150,
+        timeout: float = 45,
     ):
         super().__init__(api_key, base_url=base_url, timeout=timeout)
         self._session = requests.Session(
@@ -187,7 +187,7 @@ class AsyncClient(_BaseClient):
         api_key: str,
         *,
         base_url: str = "https://api.rayonapi.com",
-        timeout: float = 150,
+        timeout: float = 45,
     ):
         super().__init__(api_key, base_url=base_url, timeout=timeout)
         self._session = requests.AsyncSession(
@@ -250,7 +250,7 @@ def generate(
     api_key: str,
     *,
     base_url: str = "https://api.rayonapi.com",
-    timeout: float = 150,
+    timeout: float = 45,
 ) -> ShapeResult:
     """One-shot helper. Reuse Client for connection pooling and material-reference caching."""
     with Client(api_key, base_url=base_url, timeout=timeout) as client:

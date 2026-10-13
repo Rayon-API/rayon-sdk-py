@@ -23,7 +23,7 @@ with OpenID Connect. No stored PyPI token is required.
 2. Run `python -m pytest`, `python -m build`, and `python -m twine check dist/*`.
    Inspect both archives for source, metadata, README, and the MIT license; exclude
    local configuration, credentials, caches, and build-only dependencies.
-3. Commit the reviewed changes and tag the same commit `v1.0.0` for version `1.0.0`.
+3. Commit the reviewed changes and tag the same commit `v1.0.1` for version `1.0.1`.
 4. Push the reviewed commit and tag, then publish a GitHub release for that tag.
    Creating a published release runs `.github/workflows/publish.yml`; drafts do not.
 5. The workflow checks tag/version agreement, tests all three Python versions,

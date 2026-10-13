@@ -34,7 +34,7 @@ with Client(os.environ["RAYON_API_KEY"]) as client:
     # Explicitly access result.headers and result.profile_used for your target client.
 ```
 
-`Client(api_key, *, base_url="https://api.rayonapi.com", timeout=150)` owns a persistent ordinary-TLS session. Close it with `with` or `client.close()`. `AsyncClient` has the same operations using `async with`, `await client.generate(shape)`, `await client.usage()`, and `await client.aclose()`. `generate(shape, api_key, *, base_url=..., timeout=150)` is a one-shot helper. API keys remain in the Bearer authorization header.
+`Client(api_key, *, base_url="https://api.rayonapi.com", timeout=45)` owns a persistent ordinary-TLS session. Close it with `with` or `client.close()`. `AsyncClient` has the same operations using `async with`, `await client.generate(shape)`, `await client.usage()`, and `await client.aclose()`. `generate(shape, api_key, *, base_url=..., timeout=45)` is a one-shot helper. API keys remain in the Bearer authorization header.
 
 Supply exactly one of `scripts` and `material_ref`. `source_url`, `profile`, and all four `request` fields are always required. Use `body=None` when the target request has no body; an empty string represents an explicit empty body. GET and HEAD require `body=None`; a supplied body requires a supported text content type. Bodies are never parsed, reformatted, or encoded as a JSON object by this SDK.
 
