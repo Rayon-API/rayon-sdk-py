@@ -48,6 +48,14 @@ def result(**changes):
     return value
 
 
+@pytest.mark.parametrize("reference", ["short", "ref.with.punctuation", "a" * 129])
+def test_result_rejects_material_reference_that_cannot_be_reused(transport, reference):
+    transport["body"] = result(material_ref=reference)
+    with sdk.Client(KEY) as client:
+        with pytest.raises(sdk.InvalidResponseError):
+            client.generate(shape())
+
+
 @pytest.fixture
 def transport(monkeypatch):
     state = {"calls": [], "options": [], "body": result(), "status": 200, "headers": {}}

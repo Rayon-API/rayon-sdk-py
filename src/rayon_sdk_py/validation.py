@@ -520,7 +520,7 @@ def parse_result(body, metadata, api_key):
         if ref is not None:
             if (
                 not isinstance(ref, str)
-                or not re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", ref)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{16,128}", ref)
                 or not isinstance(expiry, str)
                 or len(expiry) > 64
                 or datetime.fromisoformat(expiry.replace("Z", "+00:00")).utcoffset()
