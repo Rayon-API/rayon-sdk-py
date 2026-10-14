@@ -3,9 +3,9 @@ import math
 import re
 from datetime import datetime
 from email.utils import format_datetime, parsedate_to_datetime
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, unquote_plus, quote_plus
 from .errors import InvalidResponseError, ValidationError
-from .models import BrowserProfile, ShapeResult
+from .models import BrowserProfile, ShapeResult, FormShapeResult
 
 MAX_RESPONSE_BYTES = 256 * 1024
 
@@ -351,6 +351,105 @@ def validate_profile(profile: BrowserProfile) -> BrowserProfile:
     raise ValidationError("Invalid browser profile.")
 
 
+FORM_NAME = re.compile(r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})([abcdfz])")
+
+
+def form_pairs(body):
+    """Strict decoding with ordered duplicate application fields preserved."""
+    if not isinstance(body, str) or len(body.encode()) > 256 * 1024:
+        raise ValueError
+    if re.search(r"%(?![0-9A-Fa-f]{2})", body):
+        raise ValueError
+    pairs = []
+    for part in body.split("&"):
+        if not part:
+            continue
+        key, _, val = part.partition("=")
+        key = unquote_plus(key, encoding="utf-8", errors="strict")
+        val = unquote_plus(val, encoding="utf-8", errors="strict")
+        if "\x00" in key or "\x00" in val or len(key.encode()) > 256:
+            raise ValueError
+        pairs.append((key, val))
+        if len(pairs) > 1024:
+            raise ValueError
+    return pairs
+
+
+def validate_form_request(v, r):
+    mode = v.get("mode", "header")
+    if mode not in ("header", "form"):
+        raise ValueError
+    if mode == "header":
+        if "form" in v:
+            raise ValueError
+        return
+    if (
+        r["method"] != "POST"
+        or not isinstance(r["content_type"], str)
+        or not re.fullmatch(
+            r'application/x-www-form-urlencoded(?:\s*;\s*charset\s*=\s*(?:"(?:utf-8|utf8)"|utf-8|utf8))?\s*',
+            r["content_type"],
+            re.I,
+        )
+    ):
+        raise ValueError
+    if "form" in v:
+        form = v["form"]
+        if not isinstance(form, dict) or not form.keys() <= {"id", "name"}:
+            raise ValueError
+        for value in form.values():
+            if (
+                not isinstance(value, str)
+                or len(value) > 256
+                or any(ord(c) < 32 or ord(c) == 127 for c in value)
+            ):
+                raise ValueError
+            value.encode("utf-8", errors="strict")
+    families = {}
+    for name, _ in form_pairs(r["body"]):
+        match = FORM_NAME.fullmatch(name)
+        if match:
+            families.setdefault(match[1], set()).add(match[2])
+    if any(slots == set("abcdfz") for slots in families.values()):
+        raise ValueError
+
+
+def safe_form_fields(fields, body):
+    if not isinstance(fields, dict) or len(fields) != 6:
+        raise ValueError
+    families, slots = set(), set()
+    for name, value in fields.items():
+        match = FORM_NAME.fullmatch(name)
+        if (
+            not match
+            or not isinstance(value, str)
+            or len(value.encode()) > 16384
+            or any(ord(c) < 32 or ord(c) == 127 for c in value)
+            or (match[2] != "d" and not value)
+        ):
+            raise ValueError
+        families.add(match[1])
+        slots.add(match[2])
+
+    def encode(value):
+        return quote_plus(value, safe="*", encoding="utf-8", errors="strict").replace(
+            "~", "%7E"
+        )
+
+    expected = "&".join(
+        encode(name) + "=" + encode(value) for name, value in fields.items()
+    )
+    if (
+        len(families) != 1
+        or slots != set("abcdfz")
+        or not isinstance(body, str)
+        or len(body.encode()) > 256 * 1024
+        or body != expected
+    ):
+        raise ValueError
+    return fields
+
+
 def validate_shape(value):
     try:
         v = json_copy(value)
@@ -365,6 +464,8 @@ def validate_shape(value):
                 "profile",
                 "request",
                 "document_cookie",
+                "mode",
+                "form",
             }
         ):
             raise ValueError
@@ -423,6 +524,7 @@ def validate_shape(value):
             .startswith(("image/", "audio/", "video/", "multipart/"))
         ):
             raise ValueError
+        validate_form_request(v, r)
         if "document_cookie" in v and (
             not isinstance(v["document_cookie"], str)
             or len(v["document_cookie"].encode()) > 16 * 1024
@@ -477,13 +579,12 @@ def response_metadata(response, api_key, body=None):
     )
 
 
-def parse_result(body, metadata, api_key):
+def parse_result(body, metadata, api_key, mode="header"):
     try:
         v = json_copy(body)
         if (
             not isinstance(v, dict)
-            or not {"headers", "request_id", "generation_ms", "profile_used"}
-            <= v.keys()
+            or not {"request_id", "generation_ms", "profile_used"} <= v.keys()
         ):
             raise ValueError
         if (
@@ -493,25 +594,40 @@ def parse_result(body, metadata, api_key):
             or not isinstance(v["profile_used"], dict)
         ):
             raise ValueError
-        headers = v["headers"]
-        if not isinstance(headers, dict) or len(headers) != 6:
-            raise ValueError
-        families = []
-        suffixes = []
-        for name, value in headers.items():
-            m = re.fullmatch(
-                r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-([abcdfz])", name, re.I
-            )
+        if mode == "form":
+            if "headers" in v:
+                raise ValueError
+            fields = safe_form_fields(v.get("form_fields"), v.get("form_body"))
+        elif mode == "header":
+            if "form_fields" in v or "form_body" in v or "headers" not in v:
+                raise ValueError
+            headers = v["headers"]
+            if not isinstance(headers, dict) or len(headers) not in (6, 7):
+                raise ValueError
+            families = []
+            suffixes = []
+            for name, value in headers.items():
+                m = re.fullmatch(
+                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-(a0|[abcdfz])",
+                    name,
+                    re.I | re.ASCII,
+                )
+                if (
+                    not m
+                    or not isinstance(value, str)
+                    or any(not 33 <= ord(c) <= 126 for c in value)
+                    or (m[2].lower() != "d" and not value.strip())
+                ):
+                    raise ValueError
+                families.append(m[1].lower())
+                suffixes.append(m[2].lower())
             if (
-                not m
-                or not isinstance(value, str)
-                or any(not 33 <= ord(c) <= 126 for c in value)
-                or (m[2].lower() != "d" and not value.strip())
+                len(set(families)) != 1
+                or len(set(suffixes)) != len(suffixes)
+                or not set("abcdfz") <= set(suffixes)
             ):
                 raise ValueError
-            families.append(m[1].lower())
-            suffixes.append(m[2].lower())
-        if len(set(families)) != 1 or set(suffixes) != set("abcdfz"):
+        else:
             raise ValueError
         ref = v.get("material_ref")
         expiry = v.get("material_expires_at")
@@ -527,6 +643,16 @@ def parse_result(body, metadata, api_key):
                 is None
             ):
                 raise ValueError
+        if mode == "form":
+            return FormShapeResult(
+                fields,
+                v["form_body"],
+                v["request_id"],
+                v["generation_ms"],
+                v["profile_used"],
+                ref,
+                expiry,
+            )
         return ShapeResult(
             headers, v["request_id"], v["generation_ms"], v["profile_used"], ref, expiry
         )

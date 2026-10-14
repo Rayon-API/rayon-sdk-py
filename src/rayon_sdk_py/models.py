@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, TypedDict
+from typing import Any, Literal, TypedDict
 
 
 class ScriptMaterial(TypedDict):
@@ -81,17 +81,47 @@ class _ShapeRequired(TypedDict):
     request: TargetRequest
 
 
+class FormMetadata(TypedDict, total=False):
+    id: str
+    name: str
+
+
 class ShapeRequest(_ShapeRequired, total=False):
     """Provide exactly one of scripts and material_ref."""
 
     scripts: list[ScriptMaterial]
     material_ref: str
     document_cookie: str
+    mode: Literal["header"]
+
+
+class _FormRequired(_ShapeRequired):
+    mode: Literal["form"]
+
+
+class FormShapeRequest(_FormRequired, total=False):
+    """Application form before telemetry insertion; exactly one material input."""
+
+    scripts: list[ScriptMaterial]
+    material_ref: str
+    document_cookie: str
+    form: FormMetadata
 
 
 @dataclass(frozen=True)
 class ShapeResult:
     headers: dict[str, str] = field(repr=False)
+    request_id: str
+    generation_ms: int
+    profile_used: dict[str, Any] = field(repr=False)
+    material_ref: str = field(repr=False)
+    material_expires_at: str
+
+
+@dataclass(frozen=True)
+class FormShapeResult:
+    form_fields: dict[str, str] = field(repr=False)
+    form_body: str = field(repr=False)
     request_id: str
     generation_ms: int
     profile_used: dict[str, Any] = field(repr=False)

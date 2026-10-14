@@ -23,7 +23,7 @@ with OpenID Connect. No stored PyPI token is required.
 2. Run `python -m pytest`, `python -m build`, and `python -m twine check dist/*`.
    Inspect both archives for source, metadata, README, and the MIT license; exclude
    local configuration, credentials, caches, and build-only dependencies.
-3. Commit the reviewed changes and tag the same commit `v1.0.3` for version `1.0.3`.
+3. Commit the reviewed changes and tag the same commit `v1.1.0` for version `1.1.0`.
 4. Push the reviewed commit and tag, then publish a GitHub release for that tag.
    Creating a published release runs `.github/workflows/publish.yml`; drafts do not.
 5. The workflow checks tag/version agreement, tests all three Python versions,
@@ -38,3 +38,9 @@ Version 1.0 is a breaking migration to the material-only API. Verify the README 
 Version 1.0.2 rejects server-issued material references that cannot be reused as valid requests. Verify the short, oversized, and invalid-character response reference regressions before release.
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+Version 1.1.0 adds optional form mode. Verify strict encoding, application duplicates,
+exact-case form families, telemetry-only body composition, transport mismatch rejection,
+material reuse, and new public form types before publishing. Verify the six required
+headers with optional fresh same-family `a0`, original names and values, duplicate and
+incomplete-family rejection, and exactly six form fields with a larger `a` value.

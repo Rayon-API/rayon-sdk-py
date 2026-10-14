@@ -6,6 +6,9 @@ from .models import (
     ShapeRequest,
     BrowserProfile,
     ShapeResult,
+    FormShapeResult,
+    FormShapeRequest,
+    FormMetadata,
     ScriptMaterial,
     TargetRequest,
 )
@@ -19,7 +22,7 @@ from .errors import (
     InvalidResponseError,
 )
 
-__version__ = "1.0.3"
+__version__ = "1.1.0"
 __all__ = [
     "Client",
     "AsyncClient",
@@ -28,6 +31,9 @@ __all__ = [
     "ShapeRequest",
     "BrowserProfile",
     "ShapeResult",
+    "FormShapeResult",
+    "FormShapeRequest",
+    "FormMetadata",
     "ScriptMaterial",
     "TargetRequest",
     "RayonError",
