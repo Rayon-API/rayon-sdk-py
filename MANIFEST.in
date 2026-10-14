@@ -1,2 +1,3 @@
 include RELEASE.md
 recursive-include tests/fixtures *.json
+include CHANGELOG.md
