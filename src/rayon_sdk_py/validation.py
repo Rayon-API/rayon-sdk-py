@@ -602,13 +602,13 @@ def parse_result(body, metadata, api_key, mode="header"):
             if "form_fields" in v or "form_body" in v or "headers" not in v:
                 raise ValueError
             headers = v["headers"]
-            if not isinstance(headers, dict) or len(headers) != 6:
+            if not isinstance(headers, dict) or len(headers) not in (6, 7):
                 raise ValueError
             families = []
             suffixes = []
             for name, value in headers.items():
                 m = re.fullmatch(
-                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-([abcdfz])", name, re.I
+                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-(a0|[abcdfz])", name, re.I
                 )
                 if (
                     not m
@@ -619,7 +619,11 @@ def parse_result(body, metadata, api_key, mode="header"):
                     raise ValueError
                 families.append(m[1].lower())
                 suffixes.append(m[2].lower())
-            if len(set(families)) != 1 or set(suffixes) != set("abcdfz"):
+            if (
+                len(set(families)) != 1
+                or len(set(suffixes)) != len(suffixes)
+                or not set("abcdfz") <= set(suffixes)
+            ):
                 raise ValueError
         else:
             raise ValueError

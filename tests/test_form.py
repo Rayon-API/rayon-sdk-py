@@ -192,3 +192,18 @@ def test_form_identity_requires_valid_utf8():
     value["form"]["id"] = "\ud800"
     with pytest.raises(sdk.ValidationError):
         validate_shape(value)
+
+
+def test_form_keeps_exactly_six_fields_with_a_larger_a_value():
+    from urllib.parse import urlencode
+
+    value = form_result()
+    value["form_fields"]["ExactBasea"] = "x" * 16384
+    value["form_body"] = urlencode(value["form_fields"], safe="*").replace("~", "%7E")
+    output = parse_result(value, {}, KEY, "form")
+    assert len(output.form_fields) == 6
+    assert output.form_fields["ExactBasea"] == "x" * 16384
+    value["form_fields"]["ExactBasea0"] = "supplement"
+    value["form_body"] = urlencode(value["form_fields"], safe="*").replace("~", "%7E")
+    with pytest.raises(sdk.InvalidResponseError):
+        parse_result(value, {}, KEY, "form")

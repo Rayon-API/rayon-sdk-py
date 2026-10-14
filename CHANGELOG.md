@@ -5,7 +5,10 @@
 Add opt-in `mode: "form"` generation with typed form results, exact-case ordered
 fields, and a telemetry-only encoded body. Validate form transport, UTF-8, limits,
 and complete telemetry families. Default header generation and material reuse remain
-compatible. Reject mismatched response transports and redact form values in inspection.
+compatible. Accept the six required headers plus an optional fresh same-family `a0`,
+preserving returned names and values. Reject incomplete, duplicate, mixed-family and
+unsafe header sets. Form results remain exactly six fields. Reject mismatched response
+transports and redact form values in inspection.
 
 ## 1.0.3
 

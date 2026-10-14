@@ -41,4 +41,6 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 Version 1.1.0 adds optional form mode. Verify strict encoding, application duplicates,
 exact-case form families, telemetry-only body composition, transport mismatch rejection,
-material reuse, and new public form types before publishing.
+material reuse, and new public form types before publishing. Verify the six required
+headers with optional fresh same-family `a0`, original names and values, duplicate and
+incomplete-family rejection, and exactly six form fields with a larger `a` value.
