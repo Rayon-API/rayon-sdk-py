@@ -3,8 +3,8 @@ import hashlib
 import json
 import time
 from datetime import datetime
-from typing import Any
-from .models import ShapeRequest, ShapeResult
+from typing import Any, overload
+from .models import ShapeRequest, ShapeResult, FormShapeResult, FormShapeRequest
 from curl_cffi import CurlOpt, requests
 from curl_cffi.curl import CURL_WRITEFUNC_ERROR
 from .errors import (
@@ -166,10 +166,20 @@ class Client(_BaseClient):
             self._failed(state)
         return self._decode(response, content, state)
 
-    def generate(self, shape: ShapeRequest) -> ShapeResult:
+    @overload
+    def generate(self, shape: ShapeRequest) -> ShapeResult: ...
+
+    @overload
+    def generate(self, shape: FormShapeRequest) -> FormShapeResult: ...
+
+    def generate(
+        self, shape: ShapeRequest | FormShapeRequest
+    ) -> ShapeResult | FormShapeResult:
         body, key = self._shape(shape)
         value, metadata = self._send("POST", "/v1/shape", body)
-        result = parse_result(value, metadata, self._api_key)
+        result = parse_result(
+            value, metadata, self._api_key, body.get("mode", "header")
+        )
         self._remember(key, result)
         return result
 
@@ -233,10 +243,20 @@ class AsyncClient(_BaseClient):
             self._failed(state)
         return decoded
 
-    async def generate(self, shape: ShapeRequest) -> ShapeResult:
+    @overload
+    async def generate(self, shape: ShapeRequest) -> ShapeResult: ...
+
+    @overload
+    async def generate(self, shape: FormShapeRequest) -> FormShapeResult: ...
+
+    async def generate(
+        self, shape: ShapeRequest | FormShapeRequest
+    ) -> ShapeResult | FormShapeResult:
         body, key = self._shape(shape)
         value, metadata = await self._send("POST", "/v1/shape", body)
-        result = parse_result(value, metadata, self._api_key)
+        result = parse_result(
+            value, metadata, self._api_key, body.get("mode", "header")
+        )
         self._remember(key, result)
         return result
 
@@ -245,13 +265,33 @@ class AsyncClient(_BaseClient):
         return value
 
 
+@overload
 def generate(
     shape: ShapeRequest,
     api_key: str,
     *,
     base_url: str = "https://api.rayonapi.com",
     timeout: float = 45,
-) -> ShapeResult:
+) -> ShapeResult: ...
+
+
+@overload
+def generate(
+    shape: FormShapeRequest,
+    api_key: str,
+    *,
+    base_url: str = "https://api.rayonapi.com",
+    timeout: float = 45,
+) -> FormShapeResult: ...
+
+
+def generate(
+    shape: ShapeRequest | FormShapeRequest,
+    api_key: str,
+    *,
+    base_url: str = "https://api.rayonapi.com",
+    timeout: float = 45,
+) -> ShapeResult | FormShapeResult:
     """One-shot helper. Reuse Client for connection pooling and material-reference caching."""
     with Client(api_key, base_url=base_url, timeout=timeout) as client:
         return client.generate(shape)
