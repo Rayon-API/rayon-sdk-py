@@ -608,7 +608,9 @@ def parse_result(body, metadata, api_key, mode="header"):
             suffixes = []
             for name, value in headers.items():
                 m = re.fullmatch(
-                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-(a0|[abcdfz])", name, re.I
+                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-(a0|[abcdfz])",
+                    name,
+                    re.I | re.ASCII,
                 )
                 if (
                     not m

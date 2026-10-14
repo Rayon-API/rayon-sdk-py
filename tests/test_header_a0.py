@@ -75,3 +75,12 @@ def test_optional_a0_obeys_the_response_byte_limit(transport):
     transport["body"] = result(headers=headers() | {"eXACT-bASE-A0": "x" * (256 * 1024)})
     with pytest.raises(sdk.InvalidResponseError):
         sdk.generate(shape(), KEY)
+
+
+@pytest.mark.parametrize("prefix", ["CuKtomer", "Cuſtomer", "Cuıstomer", "Cuİstomer"])
+@pytest.mark.parametrize("optional_a0", [False, True])
+def test_header_family_names_require_ascii_tokens(prefix, optional_a0):
+    suffixes = list("abcdfz") + (["A0"] if optional_a0 else [])
+    value = {f"{prefix}-{suffix}": "" if suffix == "d" else "value" for suffix in suffixes}
+    with pytest.raises(sdk.InvalidResponseError):
+        parse_result(result(headers=value), {}, KEY)
