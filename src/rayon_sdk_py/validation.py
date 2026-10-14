@@ -404,6 +404,7 @@ def validate_form_request(v, r):
                 or any(ord(c) < 32 or ord(c) == 127 for c in value)
             ):
                 raise ValueError
+            value.encode("utf-8", errors="strict")
     families = {}
     for name, _ in form_pairs(r["body"]):
         match = FORM_NAME.fullmatch(name)

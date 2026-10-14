@@ -185,3 +185,10 @@ def test_async_form_response_and_mode_check(transport):
                 await client.generate(form_shape())
 
     asyncio.run(run())
+
+
+def test_form_identity_requires_valid_utf8():
+    value = form_shape()
+    value["form"]["id"] = "\ud800"
+    with pytest.raises(sdk.ValidationError):
+        validate_shape(value)
