@@ -192,7 +192,7 @@ def test_error_envelope_sanitized_no_retries(transport, status):
         status=status,
         body={
             "error": {
-                "code": "api_retired" if status == 410 else "rate_limited",
+                "code": "http_error",
                 "message": KEY + " private",
                 "request_id": "req-safe",
             }
@@ -202,6 +202,9 @@ def test_error_envelope_sanitized_no_retries(transport, status):
     with pytest.raises(sdk.HTTPError) as caught:
         sdk.generate(shape(), KEY)
     assert caught.value.status_code == status
+    if status == 410:
+        assert type(caught.value) is sdk.HTTPError
+        assert str(caught.value) == "Rayon API returned an unsuccessful HTTP status."
     assert caught.value.request_id == "req-safe"
     assert caught.value.retry_after == "12"
     assert KEY not in repr(caught.value)
@@ -244,8 +247,10 @@ def test_expired_and_distinct_material_never_reuse_ref(transport):
     assert all("scripts" in call[2]["json"] for call in transport["calls"])
 
 
-def test_retired_solve_not_exported():
-    assert not hasattr(sdk, "solve")
+def test_generation_clients_and_helper_exported():
+    assert callable(sdk.generate)
+    assert callable(sdk.Client.generate)
+    assert callable(sdk.AsyncClient.generate)
 
 
 @pytest.mark.parametrize(

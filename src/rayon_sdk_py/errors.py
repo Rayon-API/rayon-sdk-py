@@ -28,7 +28,7 @@ class RedirectError(HTTPError):
 
 
 class MigrationError(HTTPError):
-    """HTTP 410: migrate to the material-only v1 API."""
+    """Compatibility subclass for HTTP errors."""
 
 
 class InvalidResponseError(RayonError):
