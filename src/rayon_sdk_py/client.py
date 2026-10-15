@@ -10,7 +10,6 @@ from curl_cffi.curl import CURL_WRITEFUNC_ERROR
 from .errors import (
     HTTPError,
     InvalidResponseError,
-    MigrationError,
     RedirectError,
     TransportError,
     ValidationError,
@@ -102,11 +101,6 @@ class _BaseClient:
         if 300 <= response.status_code < 400:
             raise RedirectError(
                 "Rayon API returned a redirect; no redirect was followed.", **metadata
-            )
-        if response.status_code == 410:
-            raise MigrationError(
-                "This API is retired. Migrate to POST /v1/shape with caller-supplied material.",
-                **metadata,
             )
         if response.status_code != 200:
             raise HTTPError(

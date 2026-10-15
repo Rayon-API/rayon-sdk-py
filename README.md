@@ -81,7 +81,7 @@ a larger `a` value remains one field and does not add `a0`.
 insertion order. Prepend it once to the original application body; do not encode it
 again, convert application fields to a dictionary, or send stale telemetry in the input.
 Retain the same cookies and browser identity for the target request. The SDK calls
-public `POST /v1/shape`; it does not use the private `/solve` tool.
+public `POST /v1/shape`.
 
 ## Clients and errors
 

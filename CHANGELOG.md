@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+Clarify HTTP errors and current API guidance.
+
 ## 1.1.0
 
 Add opt-in `mode: "form"` generation with typed form results, exact-case ordered
