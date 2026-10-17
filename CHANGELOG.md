@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 — 2026-10-17
+
+- Expose the API’s optional retryable flag without changing retry behaviour.
+- Explain request-history settlement states and uncertain outcomes.
+
 ## 1.1.1
 
 Clarify HTTP errors and current API guidance.

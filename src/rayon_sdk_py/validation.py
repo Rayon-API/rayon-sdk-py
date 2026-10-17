@@ -549,10 +549,12 @@ def safe_id(value, api_key):
 
 
 def response_metadata(response, api_key, body=None):
+    retryable = None
     request_id = safe_id(response.headers.get("X-Request-ID"), api_key)
     code = None
     if isinstance(body, dict) and isinstance(body.get("error"), dict):
         error = body["error"]
+        retryable = error.get("retryable") if type(error.get("retryable")) is bool else None
         request_id = safe_id(error.get("request_id"), api_key) or request_id
         val = error.get("code")
         code = (
@@ -572,6 +574,7 @@ def response_metadata(response, api_key, body=None):
         except (ValueError, TypeError, OverflowError):
             retry = None
     return dict(
+        retryable=retryable,
         status_code=response.status_code,
         request_id=request_id,
         retry_after=retry,

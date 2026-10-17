@@ -97,3 +97,9 @@ No automatic retries. A client timeout may occur after successful generation; ch
 See the [API reference](https://docs.rayonapi.com/api-reference) and [errors](https://docs.rayonapi.com/errors).
 
 [Support](mailto:support@rayonapi.com) · [Discord](https://discord.gg/TwhkJNyHWs) · [MIT license](LICENSE)
+
+### Retry guidance and request history
+
+API errors may include an optional `retryable` boolean. The SDK exposes it as `error.retryable`; missing or invalid metadata stays None. This guides handling of a definite server error; request history confirms the original billing outcome. Respect `Retry-After`, use backoff with jitter and reduce concurrency. Correct input/access/material errors before retrying.
+
+Generation requests are never automatically retried. A network timeout or an uncertain settlement response may hide a completed generation: check **Dashboard → Request history → domain → Details** and share the request ID with support before resubmitting. Details distinguish verified **Not charged**, **Processing billing**, allowance/wallet use and an unavailable billing check.
