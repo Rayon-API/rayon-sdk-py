@@ -359,5 +359,197 @@
     "message": "The request could not be completed.",
     "action": "Contact support with the request ID. Check request history before sending another request.",
     "retryable": false
+  },
+  "daily_quota_exceeded": {
+    "codes": [
+      "daily_quota_exceeded"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "durable_redis_required": {
+    "codes": [
+      "durable_redis_required"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "gateway_authority_unavailable": {
+    "codes": [
+      "gateway_authority_unavailable"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "gateway_background_failed": {
+    "codes": [
+      "gateway_background_failed"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "gateway_build_manifest_required": {
+    "codes": [
+      "gateway_build_manifest_required"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "http_shutdown_failed": {
+    "codes": [
+      "http_shutdown_failed"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_concurrency": {
+    "codes": [
+      "invalid_concurrency"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_event": {
+    "codes": [
+      "invalid_event"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_gateway_build": {
+    "codes": [
+      "invalid_gateway_build"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_key_cache_configuration": {
+    "codes": [
+      "invalid_key_cache_configuration"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_key_snapshot": {
+    "codes": [
+      "invalid_key_snapshot"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_native_source_digest": {
+    "codes": [
+      "invalid_native_source_digest"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_registry": {
+    "codes": [
+      "invalid_registry"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_worker_client": {
+    "codes": [
+      "invalid_worker_client"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_worker_source_digest": {
+    "codes": [
+      "invalid_worker_source_digest"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_worker_token": {
+    "codes": [
+      "invalid_worker_token"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "invalid_worker_url": {
+    "codes": [
+      "invalid_worker_url"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "listener_unavailable": {
+    "codes": [
+      "listener_unavailable"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "monthly_quota_exceeded": {
+    "codes": [
+      "monthly_quota_exceeded"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "native_build_mismatch": {
+    "codes": [
+      "native_build_mismatch"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "outcome_already_attempted": {
+    "codes": [
+      "outcome_already_attempted"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "outcome_conflict": {
+    "codes": [
+      "outcome_conflict"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "publisher_conflict": {
+    "codes": [
+      "publisher_conflict"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "registry_capacity": {
+    "codes": [
+      "registry_capacity"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
   }
 }
