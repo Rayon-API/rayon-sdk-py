@@ -5,11 +5,15 @@ from importlib.resources import files
 _ERROR_CATALOG = json.loads(files(__package__).joinpath("error_catalog.json").read_text(encoding="utf-8"))
 
 
-def trusted_guidance(code, reason, domain=None):
+HISTORY_ACTION = "Check request history before sending another request. Contact support with the request ID if it remains unclear."
+
+
+def trusted_guidance(code, reason, domain=None, retryable=None, billing_status=None):
     entry = _ERROR_CATALOG.get(reason) if isinstance(reason, str) else None
     if not entry or code not in entry["codes"]:
         return None
-    return dict(reason=reason, message=entry["message"].replace("{domain}", safe_domain(domain) or "this domain"), action=entry["action"])
+    action = HISTORY_ACTION if entry["retryable"] and (safe_billing_status(billing_status) != "not_charged" or retryable is False) else entry["action"]
+    return dict(reason=reason, message=entry["message"].replace("{domain}", safe_domain(domain) or "this domain"), action=action)
 
 
 class RayonError(Exception):
@@ -19,7 +23,7 @@ class RayonError(Exception):
         self, message, *, status_code=None, request_id=None, retry_after=None, code=None, retryable=None,
         reason=None, action=None, domain=None, field=None, billing_status=None
     ):
-        guidance = trusted_guidance(code, reason, domain)
+        guidance = trusted_guidance(code, reason, domain, retryable, billing_status)
         super().__init__(guidance["message"] if guidance else message)
         self.status_code = status_code
         self.request_id = request_id
@@ -30,7 +34,7 @@ class RayonError(Exception):
         self.action = guidance["action"] if guidance else None
         self.domain = safe_domain(domain)
         self.field = safe_field(field)
-        self.billing_status = billing_status
+        self.billing_status = safe_billing_status(billing_status)
 
 
 class ValidationError(RayonError, ValueError):
@@ -70,3 +74,7 @@ def safe_field(value, api_key=None):
         and re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*", value)
         and not {"__proto__", "constructor", "prototype"}.intersection(value.split("."))
     ) else None
+
+
+def safe_billing_status(value):
+    return value if isinstance(value, str) and value in {"not_charged", "pending", "unknown"} else None
