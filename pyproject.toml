@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rayon-sdk-py"
-version = "1.1.2"
+version = "1.1.3"
 description = "Persistent synchronous and asynchronous clients for the material-only Rayon API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -34,4 +34,4 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.setuptools.package-data]
-rayon_sdk_py = ["py.typed"]
+rayon_sdk_py = ["py.typed", "error_catalog.json"]

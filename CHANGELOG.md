@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.3 — Unreleased (2026-10-19)
+
+- Add optional trusted error reasons, recovery guidance, safe domain/field metadata and billing status.
+- Preserve existing exception types, codes, request IDs and retry behavior.
+
 ## 1.1.2 — 2026-10-17
 
 - Expose the API’s optional retryable flag without changing retry behaviour.

@@ -1,0 +1,363 @@
+{
+  "unauthorized": {
+    "codes": [
+      "unauthorized"
+    ],
+    "message": "Your API key is missing, invalid, disabled or expired.",
+    "action": "Use an active API key from your dashboard.",
+    "retryable": false
+  },
+  "access_denied": {
+    "codes": [
+      "access_denied"
+    ],
+    "message": "Your account does not have access to this request.",
+    "action": "Check account status, policy acceptance and domain access in your dashboard.",
+    "retryable": false
+  },
+  "account_disabled": {
+    "codes": [
+      "access_denied"
+    ],
+    "message": "Your account is disabled.",
+    "action": "Contact support to review your account.",
+    "retryable": false
+  },
+  "account_expired": {
+    "codes": [
+      "access_denied"
+    ],
+    "message": "Your account access has expired.",
+    "action": "Check your access in the dashboard or contact support.",
+    "retryable": false
+  },
+  "policies_required": {
+    "codes": [
+      "policies_required",
+      "access_denied"
+    ],
+    "message": "Accept the current Terms and Privacy Policy before using the API.",
+    "action": "Open your dashboard and accept the current policies.",
+    "retryable": false
+  },
+  "domain_not_approved": {
+    "codes": [
+      "domain_not_approved",
+      "access_denied"
+    ],
+    "message": "Access to {domain} has not been approved.",
+    "action": "Request access to this domain in your dashboard.",
+    "retryable": false
+  },
+  "domain_pending": {
+    "codes": [
+      "domain_not_approved",
+      "access_denied"
+    ],
+    "message": "Access to {domain} is awaiting review.",
+    "action": "Check the domain request in your dashboard. Retry once it is approved.",
+    "retryable": false
+  },
+  "insufficient_credits": {
+    "codes": [
+      "insufficient_credits"
+    ],
+    "message": "No available allowance or sufficient wallet balance remains.",
+    "action": "Top up your wallet or add an active allowance in your dashboard.",
+    "retryable": false
+  },
+  "credits_warming": {
+    "codes": [
+      "credits_warming"
+    ],
+    "message": "Your credits are being prepared.",
+    "action": "Wait a moment, then retry. Contact support if this continues.",
+    "retryable": true,
+    "retry_after": 1
+  },
+  "rate_limited": {
+    "codes": [
+      "rate_limited",
+      "rate_limit_exceeded"
+    ],
+    "message": "Your account request rate is too high.",
+    "action": "Wait for Retry-After, then send requests more slowly.",
+    "retryable": true,
+    "retry_after": 1
+  },
+  "rate_limit_exceeded": {
+    "codes": [
+      "rate_limit_exceeded"
+    ],
+    "message": "Your account request rate is too high.",
+    "action": "Wait for Retry-After, then send requests more slowly.",
+    "retryable": true,
+    "retry_after": 1
+  },
+  "concurrency_exceeded": {
+    "codes": [
+      "concurrency_exceeded"
+    ],
+    "message": "Too many requests are running at once.",
+    "action": "Wait for running requests to finish, then retry.",
+    "retryable": true,
+    "retry_after": 1
+  },
+  "capacity_exceeded": {
+    "codes": [
+      "capacity_exceeded"
+    ],
+    "message": "The service is at capacity.",
+    "action": "Wait for Retry-After, then retry with fewer concurrent requests.",
+    "retryable": true,
+    "retry_after": 1
+  },
+  "invalid_input": {
+    "codes": [
+      "invalid_input"
+    ],
+    "message": "Some request fields are missing or invalid.",
+    "action": "Check the request fields against the API reference.",
+    "retryable": false
+  },
+  "unsupported_profile": {
+    "codes": [
+      "unsupported_profile"
+    ],
+    "message": "The browser profile is invalid or unsupported.",
+    "action": "Check the profile fields against the API reference.",
+    "retryable": false
+  },
+  "unsupported_material": {
+    "codes": [
+      "unsupported_material"
+    ],
+    "message": "The supplied scripts did not produce usable headers or form fields.",
+    "action": "Upload complete, current scripts in execution order. Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "input_too_large": {
+    "codes": [
+      "input_too_large"
+    ],
+    "message": "The request exceeds the upload limit.",
+    "action": "Reduce the request size to the documented limits.",
+    "retryable": false
+  },
+  "output_too_large": {
+    "codes": [
+      "output_too_large"
+    ],
+    "message": "The generated response exceeds the output limit.",
+    "action": "Contact support with the request ID.",
+    "retryable": false
+  },
+  "unsupported_encoding": {
+    "codes": [
+      "unsupported_encoding"
+    ],
+    "message": "The request encoding is not supported.",
+    "action": "Use a supported Content-Encoding from the API reference.",
+    "retryable": false
+  },
+  "unsupported_media_type": {
+    "codes": [
+      "unsupported_media_type"
+    ],
+    "message": "The request content type is not supported.",
+    "action": "Send the API request as application/json.",
+    "retryable": false
+  },
+  "input_timeout": {
+    "codes": [
+      "input_timeout"
+    ],
+    "message": "The request upload took too long.",
+    "action": "Finish the upload within the documented deadline, then retry.",
+    "retryable": false
+  },
+  "material_expired": {
+    "codes": [
+      "material_expired"
+    ],
+    "message": "The material reference has expired.",
+    "action": "Upload the scripts again to obtain a fresh reference.",
+    "retryable": false
+  },
+  "material_context_mismatch": {
+    "codes": [
+      "material_context_mismatch"
+    ],
+    "message": "The material reference belongs to a different page URL.",
+    "action": "Use the original source_url or upload scripts for the new page.",
+    "retryable": false
+  },
+  "material_cache_full": {
+    "codes": [
+      "material_cache_full"
+    ],
+    "message": "The material cache is at capacity.",
+    "action": "Wait before uploading more material, or reuse a valid reference.",
+    "retryable": false
+  },
+  "material_cache_unavailable": {
+    "codes": [
+      "material_cache_unavailable"
+    ],
+    "message": "Material storage is temporarily unavailable.",
+    "action": "Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "generation_timeout": {
+    "codes": [
+      "generation_timeout"
+    ],
+    "message": "Header generation exceeded its deadline.",
+    "action": "Retry once with backoff. Contact support with the request ID if this continues.",
+    "retryable": true
+  },
+  "generation_unavailable": {
+    "codes": [
+      "generation_unavailable"
+    ],
+    "message": "Header generation is temporarily unavailable.",
+    "action": "Retry with backoff. Contact support with the request ID if this continues.",
+    "retryable": true
+  },
+  "authentication_unavailable": {
+    "codes": [
+      "authentication_unavailable"
+    ],
+    "message": "API key verification is temporarily unavailable.",
+    "action": "Wait before retrying. Contact support if this continues.",
+    "retryable": false
+  },
+  "generation_failed": {
+    "codes": [
+      "generation_failed"
+    ],
+    "message": "The supplied material could not produce a valid result.",
+    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "generation_incomplete": {
+    "codes": [
+      "generation_incomplete"
+    ],
+    "message": "The supplied material could not produce a valid result.",
+    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "generation_invalid_headers": {
+    "codes": [
+      "generation_invalid_headers"
+    ],
+    "message": "The supplied material could not produce a valid result.",
+    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "generation_invalid_form": {
+    "codes": [
+      "generation_invalid_form"
+    ],
+    "message": "The supplied material could not produce a valid result.",
+    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "unknown_material": {
+    "codes": [
+      "unknown_material"
+    ],
+    "message": "The supplied material could not produce a valid result.",
+    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "retryable": false
+  },
+  "admission_unavailable": {
+    "codes": [
+      "admission_unavailable"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "authority_unavailable": {
+    "codes": [
+      "authority_unavailable"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "billing_unavailable": {
+    "codes": [
+      "billing_unavailable"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "outcome_unavailable": {
+    "codes": [
+      "outcome_unavailable"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "diagnostics_unavailable": {
+    "codes": [
+      "diagnostics_unavailable"
+    ],
+    "message": "The request outcome could not be confirmed.",
+    "action": "Check request history before sending another request. Contact support with the request ID if it remains unclear.",
+    "retryable": false
+  },
+  "request_cancelled": {
+    "codes": [
+      "request_cancelled"
+    ],
+    "message": "The request was interrupted.",
+    "action": "Check request history before sending another request.",
+    "retryable": false
+  },
+  "request_interrupted": {
+    "codes": [
+      "request_interrupted"
+    ],
+    "message": "The request was interrupted.",
+    "action": "Check request history before sending another request.",
+    "retryable": false
+  },
+  "not_found": {
+    "codes": [
+      "not_found"
+    ],
+    "message": "This API route does not exist.",
+    "action": "Check the endpoint in the API reference.",
+    "retryable": false
+  },
+  "method_not_allowed": {
+    "codes": [
+      "method_not_allowed"
+    ],
+    "message": "This HTTP method is not supported.",
+    "action": "Use the method shown in the API reference.",
+    "retryable": false
+  },
+  "api_retired": {
+    "codes": [
+      "api_retired"
+    ],
+    "message": "This endpoint has been retired.",
+    "action": "Follow the quickstart at https://docs.rayonapi.com/quickstart.",
+    "retryable": false
+  },
+  "unknown_error": {
+    "codes": [
+      "unknown_error"
+    ],
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  }
+}

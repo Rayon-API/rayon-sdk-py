@@ -103,3 +103,8 @@ See the [API reference](https://docs.rayonapi.com/api-reference) and [errors](ht
 API errors may include an optional `retryable` boolean. The SDK exposes it as `error.retryable`; missing or invalid metadata stays None. This guides handling of a definite server error; request history confirms the original billing outcome. Respect `Retry-After`, use backoff with jitter and reduce concurrency. Correct input/access/material errors before retrying.
 
 Generation requests are never automatically retried. A network timeout or an uncertain settlement response may hide a completed generation: check **Dashboard → Request history → domain → Details** and share the request ID with support before resubmitting. Details distinguish verified **Not charged**, **Processing billing**, allowance/wallet use and an unavailable billing check.
+
+Errors may also expose `reason`, `action`, `domain`, `field` and `billing_status`.
+Known code/reason pairs use built-in messages and recovery actions; arbitrary server text is discarded.
+Domain values contain only safe hostnames. Billing status is `not_charged`, `pending` or `unknown`; missing values remain `None`.
+Check request history when the outcome is uncertain. These fields do not trigger automatic retries.
