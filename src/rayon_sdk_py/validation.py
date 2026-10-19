@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from email.utils import format_datetime, parsedate_to_datetime
 from urllib.parse import urlsplit, unquote_plus, quote_plus
-from .errors import InvalidResponseError, ValidationError
+from .errors import InvalidResponseError, ValidationError, trusted_guidance, safe_domain, safe_field, safe_billing_status
 from .models import BrowserProfile, ShapeResult, FormShapeResult
 
 MAX_RESPONSE_BYTES = 256 * 1024
@@ -550,6 +550,7 @@ def safe_id(value, api_key):
 
 def response_metadata(response, api_key, body=None):
     retryable = None
+    error = {}
     request_id = safe_id(response.headers.get("X-Request-ID"), api_key)
     code = None
     if isinstance(body, dict) and isinstance(body.get("error"), dict):
@@ -573,7 +574,16 @@ def response_metadata(response, api_key, body=None):
                 retry = None
         except (ValueError, TypeError, OverflowError):
             retry = None
+    domain = safe_domain(error.get("domain"), api_key)
+    reason = error.get("reason")
+    guidance = trusted_guidance(code, reason, domain, retryable, error.get("billing_status")) if isinstance(reason, str) and api_key not in reason else None
+    billing = error.get("billing_status")
     return dict(
+        reason=guidance["reason"] if guidance else None,
+        action=guidance["action"] if guidance else None,
+        domain=domain,
+        field=safe_field(error.get("field"), api_key),
+        billing_status=safe_billing_status(billing),
         retryable=retryable,
         status_code=response.status_code,
         request_id=request_id,
