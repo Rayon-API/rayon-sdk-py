@@ -45,7 +45,9 @@ Supply exactly one of `scripts` or a server-issued `material_ref` with its origi
 All four `request` fields are required; GET/HEAD use `content_type=None`, `body=None`.
 Preserve body whitespace and encoding. Persistent clients reuse unexpired material references,
 while each call generates fresh headers from the supplied profile, request and cookies.
-If a cached reference fails, use a fresh client with the saved scripts.
+Clients retain original material in memory (up to 128 bundles and 16 MiB per client), reuse references, and upload again on the next call within five seconds of expiry. Simultaneous callers share one material upload, then each generates its own result with its current inputs. There is no background generation. Source retention ends on eviction or close and is never shared between clients, API keys or API hosts.
+
+A reference request rejected with HTTP 422, `material_expired` and `billing_status: "not_charged"` is retried once using retained scripts. Reference-only calls can recover only while their original scripts remain in this client. Keep your own source copy. A failed upload fails queued callers without sending their generations; cancelling a queued caller leaves the upload running for its owner.
 
 ## Generate form telemetry
 
@@ -93,7 +95,7 @@ The SDK authenticates with `Authorization: Bearer <API key>` and defaults to
 Errors inherit `RayonError`: `ValidationError` for invalid input, `TransportError` for network
 failures/timeouts, `HTTPError` for API failures and `InvalidResponseError` for invalid responses.
 HTTP errors expose sanitized `status_code`, `request_id`, `code` and `retry_after`.
-No automatic retries. A client timeout may occur after successful generation; check history before retrying.
+Only confirmed, uncharged material misses receive the single recovery attempt described above. A client timeout may occur after successful generation; check history before retrying.
 See the [API reference](https://docs.rayonapi.com/api-reference) and [errors](https://docs.rayonapi.com/errors).
 
 [Support](mailto:support@rayonapi.com) · [Discord](https://discord.gg/TwhkJNyHWs) · [MIT license](LICENSE)
@@ -102,7 +104,7 @@ See the [API reference](https://docs.rayonapi.com/api-reference) and [errors](ht
 
 API errors may include an optional `retryable` boolean. The SDK exposes it as `error.retryable`; missing or invalid metadata stays None. This guides handling of a definite server error; request history confirms the original billing outcome. Respect `Retry-After`, use backoff with jitter and reduce concurrency. Correct input/access/material errors before retrying.
 
-Generation requests are never automatically retried. A network timeout or an uncertain settlement response may hide a completed generation: check **Dashboard → Request history → domain → Details** and share the request ID with support before resubmitting. Details distinguish verified **Not charged**, **Processing billing**, allowance/wallet use and an unavailable billing check.
+Other generation failures are never automatically retried; in particular, transport errors, cancellation, malformed responses and absent, pending or unknown billing status do not trigger recovery. A network timeout or an uncertain settlement response may hide a completed generation: check **Dashboard → Request history → domain → Details** and share the request ID with support before resubmitting. Details distinguish verified **Not charged**, **Processing billing**, allowance/wallet use and an unavailable billing check.
 
 Errors may also expose `reason`, `action`, `domain`, `field` and `billing_status`.
 Known code/reason pairs use built-in messages and recovery actions; arbitrary server text is discarded.

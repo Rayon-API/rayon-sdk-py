@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.4 — 2026-10-20
+
+- Bound retained original material to 128 bundles / 16 MiB per client and coalesce simultaneous uploads.
+- Refresh material on the next generation shortly before expiry; recover once from confirmed uncharged material expiry.
+- Keep cancellation, transport failures and ambiguous billing outcomes outside automatic recovery.
+
 ## 1.1.3 — 2026-10-19
 
 - Add optional trusted error reasons, recovery guidance, safe domain/field metadata and billing status.

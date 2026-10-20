@@ -22,7 +22,7 @@ from .errors import (
     InvalidResponseError,
 )
 
-__version__ = "1.1.3"
+__version__ = "1.1.4"
 __all__ = [
     "Client",
     "AsyncClient",

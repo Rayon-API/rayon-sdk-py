@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import time
+import threading
 from datetime import datetime
 from typing import Any, overload
 from .models import ShapeRequest, ShapeResult, FormShapeResult, FormShapeRequest
@@ -30,6 +31,9 @@ class _BaseClient:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._cache = {}
+        self._cache_bytes = 0
+        self._material_lock = threading.Lock()
+        self._flights = {}
         self._closed = False
 
     def __repr__(self):
@@ -39,33 +43,102 @@ class _BaseClient:
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         body = validate_shape(value)
+        scripts = body.get("scripts")
         key = None
-        if "scripts" in body:
-            key = hashlib.sha256(
-                json.dumps(
-                    [body["source_url"], body["scripts"]],
-                    sort_keys=True,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                ).encode()
-            ).hexdigest()
-            cached = self._cache.get(key)
-            if cached and cached[1] > time.time():
-                del body["scripts"]
-                body["material_ref"] = cached[0]
-            elif cached:
-                del self._cache[key]
-        return body, key
+        if scripts is not None:
+            key = hashlib.sha256(json.dumps(
+                [body["source_url"], scripts], sort_keys=True,
+                ensure_ascii=False, separators=(",", ":"),
+            ).encode()).hexdigest()
+        else:
+            with self._material_lock:
+                for candidate, cached in self._cache.items():
+                    if (cached["ref"] == body["material_ref"]
+                            and cached["source_url"] == body["source_url"]):
+                        key, scripts = candidate, cached["scripts"]
+                        break
+        return body, key, scripts
 
-    def _remember(self, key, result):
-        if key and result.material_ref and result.material_expires_at:
-            expiry = datetime.fromisoformat(
-                result.material_expires_at.replace("Z", "+00:00")
-            ).timestamp()
-            if expiry > time.time():
-                if len(self._cache) >= 128:
-                    self._cache.pop(next(iter(self._cache)))
-                self._cache[key] = (result.material_ref, expiry)
+    def _select_material(self, body, key, scripts, factory):
+        """Claim one upload; other callers wait without sharing generation results."""
+        if key is None:
+            return None, False
+        with self._material_lock:
+            if self._closed:
+                raise ValidationError("Rayon client is closed.")
+            if key in self._flights:
+                return self._flights[key], False
+            cached = self._cache.get(key)
+            if cached and cached["expires"] > time.time() + 5:
+                body.pop("scripts", None)
+                body["material_ref"] = cached["ref"]
+                return None, False
+            body.pop("material_ref", None)
+            body["scripts"] = scripts
+            # Retained coordination is bounded; existing flights still coalesce.
+            flight = factory() if len(self._flights) < 128 else None
+            if flight is not None:
+                self._flights[key] = flight
+            return flight, True
+
+    def _remember(self, key, scripts, body, result):
+        # Reference generations cannot extend TTL or undo a confirmed miss.
+        if key is None or "scripts" not in body:
+            return
+        expiry = datetime.fromisoformat(result.material_expires_at.replace("Z", "+00:00")).timestamp()
+        with self._material_lock:
+            if self._closed:
+                return
+            previous = self._cache.get(key)
+            size = len(json.dumps([body["source_url"], scripts], ensure_ascii=False).encode())
+            if size > 16 * 1024 * 1024:
+                return
+            if previous:
+                self._cache_bytes -= previous["size"]
+                del self._cache[key]
+            while self._cache and (len(self._cache) >= 128 or self._cache_bytes + size > 16 * 1024 * 1024):
+                oldest = self._cache.pop(next(iter(self._cache)))
+                self._cache_bytes -= oldest["size"]
+            self._cache[key] = dict(ref=result.material_ref, expires=expiry,
+                source_url=body["source_url"], scripts=scripts, size=size)
+            self._cache_bytes += size
+
+    def _invalidate(self, key, reference):
+        with self._material_lock:
+            cached = self._cache.get(key)
+            if cached and cached["ref"] == reference:
+                cached["expires"] = 0
+
+    @staticmethod
+    def _recoverable(error, body, scripts):
+        return (scripts is not None and "material_ref" in body
+                and isinstance(error, HTTPError) and error.status_code == 422
+                and error.code == "material_expired" and error.billing_status == "not_charged")
+
+    def _finish_flight(self, key, flight, success):
+        if flight is None:
+            return
+        with self._material_lock:
+            if self._flights.get(key) is flight:
+                del self._flights[key]
+            if isinstance(flight, threading.Event):
+                flight.success = success
+                flight.set()
+            elif not flight.done():
+                flight.set_result(success)
+
+    def _clear_material(self):
+        with self._material_lock:
+            self._closed = True
+            self._cache.clear()
+            self._cache_bytes = 0
+            for flight in self._flights.values():
+                if isinstance(flight, threading.Event):
+                    flight.success = False
+                    flight.set()
+                elif not flight.done():
+                    flight.set_result(False)
+            self._flights.clear()
 
     def _options(self, body):
         content = bytearray()
@@ -143,14 +216,17 @@ class Client(_BaseClient):
 
     def close(self):
         if not self._closed:
+            self._clear_material()
             self._session.close()
-            self._cache.clear()
-            self._closed = True
 
-    def _send(self, method, path, body=None):
+    def _send(self, method, path, body=None, *, timeout=None):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         options, content, state = self._options(body)
+        budget = self._timeout if timeout is None else timeout
+        if budget <= 0:
+            raise TransportError("Rayon API request could not be completed.")
+        options["timeout"] = budget
         failed = False
         try:
             response = self._session.request(method, self._base_url + path, **options)
@@ -169,13 +245,32 @@ class Client(_BaseClient):
     def generate(
         self, shape: ShapeRequest | FormShapeRequest
     ) -> ShapeResult | FormShapeResult:
-        body, key = self._shape(shape)
-        value, metadata = self._send("POST", "/v1/shape", body)
-        result = parse_result(
-            value, metadata, self._api_key, body.get("mode", "header")
-        )
-        self._remember(key, result)
-        return result
+        body, key, scripts = self._shape(shape)
+        recovered = False
+        deadline = time.monotonic() + self._timeout
+        while True:
+            flight, owner = self._select_material(body, key, scripts, threading.Event)
+            if flight is not None and not owner:
+                if not flight.wait(max(0, deadline - time.monotonic())) or not flight.success:
+                    raise TransportError("Rayon material establishment could not be completed.")
+                continue
+            success = False
+            try:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TransportError("Rayon API request could not be completed.")
+                value, metadata = self._send("POST", "/v1/shape", body, timeout=remaining)
+                result = parse_result(value, metadata, self._api_key, body.get("mode", "header"))
+                self._remember(key, scripts, body, result)
+                success = True
+                return result
+            except HTTPError as error:
+                if recovered or not self._recoverable(error, body, scripts):
+                    raise
+                self._invalidate(key, body["material_ref"])
+                recovered = True
+            finally:
+                self._finish_flight(key, flight, success)
 
     def usage(self) -> dict[str, Any]:
         """Read account usage; never invokes a billable generation."""
@@ -208,16 +303,19 @@ class AsyncClient(_BaseClient):
 
     async def aclose(self):
         if not self._closed:
+            self._clear_material()
             await self._session.close()
-            self._cache.clear()
-            self._closed = True
 
-    async def _send(self, method, path, body=None):
+    async def _send(self, method, path, body=None, *, timeout=None):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         options, content, state = self._options(body)
+        budget = self._timeout if timeout is None else timeout
+        if budget <= 0:
+            raise TransportError("Rayon API request could not be completed.")
+        options["timeout"] = budget
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + self._timeout
+        deadline = loop.time() + budget
 
         async def complete():
             response = await self._session.request(
@@ -230,7 +328,7 @@ class AsyncClient(_BaseClient):
 
         failed = False
         try:
-            decoded = await asyncio.wait_for(complete(), timeout=self._timeout)
+            decoded = await asyncio.wait_for(complete(), timeout=budget)
         except (asyncio.TimeoutError, requests.exceptions.RequestException):
             failed = True
         if failed:
@@ -246,13 +344,40 @@ class AsyncClient(_BaseClient):
     async def generate(
         self, shape: ShapeRequest | FormShapeRequest
     ) -> ShapeResult | FormShapeResult:
-        body, key = self._shape(shape)
-        value, metadata = await self._send("POST", "/v1/shape", body)
-        result = parse_result(
-            value, metadata, self._api_key, body.get("mode", "header")
-        )
-        self._remember(key, result)
-        return result
+        body, key, scripts = self._shape(shape)
+        recovered = False
+        deadline = asyncio.get_running_loop().time() + self._timeout
+        while True:
+            flight, owner = self._select_material(body, key, scripts,
+                asyncio.get_running_loop().create_future)
+            if flight is not None and not owner:
+                failed = False
+                try:
+                    ready = await asyncio.wait_for(asyncio.shield(flight),
+                        timeout=max(0, deadline - asyncio.get_running_loop().time()))
+                    failed = not ready
+                except asyncio.TimeoutError:
+                    failed = True
+                if failed:
+                    raise TransportError("Rayon material establishment could not be completed.")
+                continue
+            success = False
+            try:
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    raise TransportError("Rayon API request could not be completed.")
+                value, metadata = await self._send("POST", "/v1/shape", body, timeout=remaining)
+                result = parse_result(value, metadata, self._api_key, body.get("mode", "header"))
+                self._remember(key, scripts, body, result)
+                success = True
+                return result
+            except HTTPError as error:
+                if recovered or not self._recoverable(error, body, scripts):
+                    raise
+                self._invalidate(key, body["material_ref"])
+                recovered = True
+            finally:
+                self._finish_flight(key, flight, success)
 
     async def usage(self) -> dict[str, Any]:
         value, _ = await self._send("GET", "/v1/usage")

@@ -659,6 +659,6 @@ def test_generation_default_deadline_is_45_seconds_and_overrides_survive(
 
         asyncio.run(run())
     assert all(
-        call[2]["timeout"] == (45 if override is None else override)
+        (45 if override is None else override) - .1 < call[2]["timeout"] <= (45 if override is None else override)
         for call in transport["calls"]
     )

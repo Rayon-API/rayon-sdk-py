@@ -46,7 +46,7 @@ class TransportError(RayonError):
 
 
 class HTTPError(RayonError):
-    """Unsuccessful HTTP status. No billable request is automatically retried."""
+    """Unsuccessful HTTP status. Only confirmed uncharged material misses may recover once."""
 
 
 class RedirectError(HTTPError):
