@@ -33,7 +33,7 @@ with OpenID Connect. No stored PyPI token is required.
 PyPI versions cannot be overwritten. If a released package needs correction,
 increment the version and publish a new release.
 
-Verify the current API instructions, sync/async lifecycle, strict input limits, exact body preservation, error envelopes, expiry-scoped references, no automatic POST retries, and packed public type exports. Never rewrite published packages or their release tags. Do not include customer scripts, captured material, credentials, or private fixtures in distributions.
+Verify the current API instructions, sync/async lifecycle, strict input limits, exact body preservation, error envelopes, expiry-scoped references, no retries of ambiguous POST outcomes and exactly one confirmed unbilled material-miss recovery in SDK 1.1.4+, and packed public type exports. Never rewrite published packages or their release tags. Do not include customer scripts, captured material, credentials, or private fixtures in distributions.
 
 Version 1.0.2 rejects server-issued material references that cannot be reused as valid requests. Verify the short, oversized, and invalid-character response reference regressions before release.
 

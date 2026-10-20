@@ -109,4 +109,4 @@ Other generation failures are never automatically retried; in particular, transp
 Errors may also expose `reason`, `action`, `domain`, `field` and `billing_status`.
 Known code/reason pairs use built-in messages and recovery actions; arbitrary server text is discarded.
 Domain values contain only safe hostnames. Billing status is `not_charged`, `pending` or `unknown`; missing values remain `None`.
-Check request history when the outcome is uncertain. These fields do not trigger automatic retries.
+Check request history when the outcome is uncertain. These fields alone do not trigger automatic retries; only the confirmed unbilled material-miss recovery described above is automatic.
