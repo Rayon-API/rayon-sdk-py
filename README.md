@@ -1,112 +1,76 @@
 # Rayon Python SDK
 
-Synchronous and asynchronous Python clients for RayonAPI Shape header and form generation and account usage.
-Requires Python 3.10+. Keep your API key on your server.
+Generate Shape headers or form telemetry and read account usage. Keep your API
+key server-side. Your integration owns its HTTP client or browser and target session.
 
-[Documentation](https://docs.rayonapi.com/) · [Examples](https://github.com/Rayon-API/rayon-examples) · [Releases](https://github.com/Rayon-API/rayon-sdk-py/releases)
+[Quickstart](https://docs.rayonapi.com/quickstart) ·
+[SDK guide](https://github.com/Rayon-API/docs/blob/main/guide/python.md) ·
+[All SDKs](https://docs.rayonapi.com/sdks)
 
 ## Install
 
 ```sh
-python -m pip install 'rayon-sdk-py>=1,<2'
+python -m pip install 'rayon-sdk-py>=1.1.4,<2'
 ```
 
-## Generate headers
+## Check usage, then generate
 
-Prepare `shape.json` with the required raw protection JavaScript in execution order, including
-loaders and payloads where used. Include their context URLs, a current browser profile,
-JavaScript-visible cookies (`document_cookie`) and the exact target URL, method, content type
-and body string. See
-[material preparation](https://docs.rayonapi.com/material) and
-[profiles and sessions](https://docs.rayonapi.com/profiles-and-sessions).
-The SDK and API use URLs as context; they do not download scripts or send the target request.
+Set `RAYON_API_KEY`. Prepare `shape.json` using the
+[input guide](https://docs.rayonapi.com/material): source-page URL, complete ordered
+script sources, a profile object and the exact target request. Include browser
+measurements or JavaScript-visible cookies only when your flow requires them.
 
 ```python
 import json
 import os
 from pathlib import Path
-from rayon_sdk_py import Client, ShapeRequest
+from rayon_sdk_py import Client
 
-shape: ShapeRequest = json.loads(Path("shape.json").read_text(encoding="utf-8"))
-with Client(os.environ["RAYON_API_KEY"], timeout=45) as client:
+with Client(os.environ["RAYON_API_KEY"]) as client:
+    usage = client.usage()  # Free; no generation quota used.
+    print(usage)
+    shape = json.loads(Path("shape.json").read_text(encoding="utf-8"))
     result = client.generate(shape)
-    target_headers = dict(result.headers)
+    # Apply result.headers using your existing target client/session.
+    # Reuse client here for further requests with their current inputs.
     print(result.request_id)
 ```
 
-Apply every returned `target_headers` to that exact request using your own target client and session.
-Header mode returns the six required same-family `a`, `b`, `c`, `d`, `f`, `z` headers
-and may include a fresh same-family `a0` header. Preserve all returned names, case and values.
-Keep its browser identity consistent with `result.profile_used` and retain the session's cookies.
-The response also includes `generation_ms`, `material_ref` and `material_expires_at`;
-it does not return target cookies or verify target acceptance.
+Apply the entire returned header map unchanged, including optional `a0`, to that
+exact request. Keep required application headers, authentication and session state
+in your target client. RayonAPI does not download scripts, send the target request
+or return target cookies. Inspect the target response to establish acceptance.
 
-Supply exactly one of `scripts` or a server-issued `material_ref` with its original `source_url`.
-All four `request` fields are required; GET/HEAD use `content_type=None`, `body=None`.
-Preserve body whitespace and encoding. Persistent clients reuse unexpired material references,
-while each call generates fresh headers from the supplied profile, request and cookies.
-Clients retain original material in memory (up to 128 bundles and 16 MiB per client), reuse references, and upload again on the next call within five seconds of expiry. Simultaneous callers share one material upload, then each generates its own result with its current inputs. There is no background generation. Source retention ends on eviction or close and is never shared between clients, API keys or API hosts.
+## Form telemetry
 
-A reference request rejected with HTTP 422, `material_expired` and `billing_status: "not_charged"` is retried once using retained scripts. Reference-only calls can recover only while their original scripts remain in this client. Keep your own source copy. A failed upload fails queued callers without sending their generations; cancelling a queued caller leaves the upload running for its owner.
+For observed URL-encoded form telemetry, use `mode: "form"` and supply the exact
+application body before telemetry insertion. The result has `form_fields` and
+`form_body`, without generated headers. Prepend `form_body` once to the original
+body, preserving its bytes, duplicate fields and encoding. See
+[Form payload integration](https://docs.rayonapi.com/form-payload-integration)
+for complete examples.
 
-## Generate form telemetry
+## Client options and errors
 
-Requires SDK 1.1+. Set `mode="form"` and provide a POST with
-`application/x-www-form-urlencoded`. `request.body` is the application form **before**
-telemetry insertion, including duplicate fields and current CSRF/session values.
-Optional `form={"id": "checkout", "name": "checkout"}` describes the form selector.
+Requires Python 3.10+. Use `AsyncClient` with `async with`,
+`await client.usage()` and `await client.generate(shape)` in async applications.
+Set `timeout=45` in the constructor to set the API timeout.
+Errors inherit `RayonError`: `ValidationError`, `TransportError`, `HTTPError`
+and `InvalidResponseError`. Available metadata includes `status_code`,
+`request_id`, `code`, `retry_after`, `reason`, `action`, `domain`, `field`,
+`billing_status` and `retryable`.
 
-```python
-from rayon_sdk_py import Client, FormShapeRequest
+The default API URL is `https://api.rayonapi.com`; default timeout is 45 seconds.
+Keep one client open across calls. Python and JavaScript SDK 1.1.4 reuse material
+in both modes while generating fresh telemetry for each request. Read the
+[material and recovery policy](https://docs.rayonapi.com/material#reuse-material-not-headers)
+for cache scope, limits and the single confirmed uncharged material recovery.
 
-# prepared_material contains source_url, scripts (or material_ref), profile and cookies.
-application_body = "item=first&item=second&csrf=current%2Bvalue"
-form_shape: FormShapeRequest = {
-    **prepared_material,
-    "mode": "form",
-    "form": {"id": "checkout"},
-    "request": {
-        "url": "https://example.com/submit",
-        "method": "POST",
-        "content_type": "application/x-www-form-urlencoded",
-        "body": application_body,
-    },
-}
-with Client(os.environ["RAYON_API_KEY"]) as client:
-    result = client.generate(form_shape)  # FormShapeResult; no headers
-    target_body = result.form_body + ("&" + application_body if application_body else "")
-```
+Check request history before resubmitting after a timeout or uncertain billing
+outcome. See [errors and retry guidance](https://docs.rayonapi.com/errors),
+[request fields](https://docs.rayonapi.com/api-reference) and
+[browser/session inputs](https://docs.rayonapi.com/profiles-and-sessions).
+The [Python download helper](https://github.com/Rayon-API/rayon-examples) is optional.
 
-`form_fields` contains exactly six raw values under the exact observed names and case;
-a larger `a` value remains one field and does not add `a0`.
-`form_body` contains only those telemetry fields, already encoded once in observed
-insertion order. Prepend it once to the original application body; do not encode it
-again, convert application fields to a dictionary, or send stale telemetry in the input.
-Retain the same cookies and browser identity for the target request. The SDK calls
-public `POST /v1/shape`.
-
-## Clients and errors
-
-The SDK authenticates with `Authorization: Bearer <API key>` and defaults to
-`https://api.rayonapi.com` with a 45-second API request timeout.
-`AsyncClient` supports `async with`, `await client.generate(shape)` and `await client.usage()`.
-`client.usage()` reads account usage; `generate(shape, api_key)` is a one-shot helper.
-
-Errors inherit `RayonError`: `ValidationError` for invalid input, `TransportError` for network
-failures/timeouts, `HTTPError` for API failures and `InvalidResponseError` for invalid responses.
-HTTP errors expose sanitized `status_code`, `request_id`, `code` and `retry_after`.
-Only confirmed, uncharged material misses receive the single recovery attempt described above. A client timeout may occur after successful generation; check history before retrying.
-See the [API reference](https://docs.rayonapi.com/api-reference) and [errors](https://docs.rayonapi.com/errors).
-
-[Support](mailto:support@rayonapi.com) · [Discord](https://discord.gg/TwhkJNyHWs) · [MIT license](LICENSE)
-
-### Retry guidance and request history
-
-API errors may include an optional `retryable` boolean. The SDK exposes it as `error.retryable`; missing or invalid metadata stays None. This guides handling of a definite server error; request history confirms the original billing outcome. Respect `Retry-After`, use backoff with jitter and reduce concurrency. Correct input/access/material errors before retrying.
-
-Other generation failures are never automatically retried; in particular, transport errors, cancellation, malformed responses and absent, pending or unknown billing status do not trigger recovery. A network timeout or an uncertain settlement response may hide a completed generation: check **Dashboard → Request history → domain → Details** and share the request ID with support before resubmitting. Details distinguish verified **Not charged**, **Processing billing**, allowance/wallet use and an unavailable billing check.
-
-Errors may also expose `reason`, `action`, `domain`, `field` and `billing_status`.
-Known code/reason pairs use built-in messages and recovery actions; arbitrary server text is discarded.
-Domain values contain only safe hostnames. Billing status is `not_charged`, `pending` or `unknown`; missing values remain `None`.
-Check request history when the outcome is uncertain. These fields alone do not trigger automatic retries; only the confirmed unbilled material-miss recovery described above is automatic.
+[Support](mailto:support@rayonapi.com) ·
+[Releases](https://github.com/Rayon-API/rayon-sdk-py/releases) · [MIT license](LICENSE)
