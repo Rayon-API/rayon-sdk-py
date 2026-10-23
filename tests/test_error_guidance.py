@@ -5,6 +5,14 @@ from rayon_sdk_py.errors import HTTPError
 from rayon_sdk_py.validation import response_metadata
 from test_sdk import transport
 
+def test_incomplete_generation_explains_loader_and_support_without_assigning_fault():
+    error=HTTPError('generic',status_code=422,code='generation_incomplete',
+                    reason='generation_incomplete',billing_status='pending',retryable=False)
+    assert str(error)=='Generation did not complete.'
+    assert 'loader' in error.action
+    assert 'If all required scripts were supplied' in error.action
+    assert error.retryable is False
+
 KEY = "test-secret-key"
 
 

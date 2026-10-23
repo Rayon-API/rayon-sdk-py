@@ -236,32 +236,32 @@
     "codes": [
       "generation_failed"
     ],
-    "message": "The supplied material could not produce a valid result.",
-    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "message": "Generation failed.",
+    "action": "Check that all required scripts are included in execution order, including scripts loaded by a loader. If all required scripts were supplied, contact support with the request ID so we can investigate runtime compatibility.",
     "retryable": false
   },
   "generation_incomplete": {
     "codes": [
       "generation_incomplete"
     ],
-    "message": "The supplied material could not produce a valid result.",
-    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "message": "Generation did not complete.",
+    "action": "Check that all required scripts are included in execution order, including scripts loaded by a loader. If all required scripts were supplied, contact support with the request ID so we can investigate runtime compatibility.",
     "retryable": false
   },
   "generation_invalid_headers": {
     "codes": [
       "generation_invalid_headers"
     ],
-    "message": "The supplied material could not produce a valid result.",
-    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "message": "Generated headers did not pass validation.",
+    "action": "Contact support with the request ID so we can investigate runtime compatibility and the supplied material.",
     "retryable": false
   },
   "generation_invalid_form": {
     "codes": [
       "generation_invalid_form"
     ],
-    "message": "The supplied material could not produce a valid result.",
-    "action": "Check the supplied material. Contact support with the request ID if this continues.",
+    "message": "Generated form did not pass validation.",
+    "action": "Contact support with the request ID so we can investigate runtime compatibility and the supplied material.",
     "retryable": false
   },
   "unknown_material": {

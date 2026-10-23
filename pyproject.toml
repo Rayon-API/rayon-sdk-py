@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rayon-sdk-py"
-version = "1.1.4"
+version = "1.1.5"
 description = "Persistent synchronous and asynchronous clients for the material-only Rayon API"
 readme = "README.md"
 requires-python = ">=3.10"
