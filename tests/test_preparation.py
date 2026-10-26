@@ -67,8 +67,10 @@ def test_async_prepare_wait_and_cancellation(transport):
             task = asyncio.create_task(client.wait_until_ready(ID))
             await asyncio.sleep(.01)
             task.cancel()
-            with pytest.raises(asyncio.CancelledError) as caught:
+            with pytest.raises(sdk.PreparationCancelledError) as caught:
                 await task
+            assert isinstance(caught.value, sdk.PreparationError)
+            assert caught.value.kind == "aborted"
             assert caught.value.preparation_id == ID
     asyncio.run(run())
 
@@ -168,3 +170,25 @@ def test_preparation_error_string_bounds(transport, error):
     transport['body'] = frame('failed', error=error)
     with sdk.Client(KEY) as client, pytest.raises(sdk.InvalidResponseError):
         client.get_preparation(ID)
+
+
+def test_async_cancellation_during_poll_preserves_typed_resume_error(transport, monkeypatch):
+    async def run():
+        entered = asyncio.Event()
+        calls = []
+        async with sdk.AsyncClient(KEY) as client:
+            async def send(method, path, **options):
+                calls.append((method, path))
+                entered.set()
+                await asyncio.Event().wait()
+            monkeypatch.setattr(client, '_send', send)
+            task = asyncio.create_task(client.wait_until_ready(ID))
+            await entered.wait()
+            task.cancel()
+            with pytest.raises(sdk.PreparationCancelledError) as caught:
+                await task
+            assert isinstance(caught.value, sdk.PreparationError)
+            assert caught.value.kind == 'aborted' and caught.value.preparation_id == ID
+            assert len(calls) == 1 and calls[0][0] == 'GET'
+            assert KEY not in repr(caught.value)
+    asyncio.run(run())

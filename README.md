@@ -22,9 +22,11 @@ with Client(api_key) as client:
 ```
 
 `AsyncClient` exposes the same four methods with `await`. Cancelling an async wait
-raises `PreparationCancelledError` (an `asyncio.CancelledError`) with a safe
+raises `PreparationCancelledError` (a `PreparationError` with `kind="aborted"`) with a safe
 `preparation_id`; the server job continues. `PreparationError.kind` is `timeout`,
-`failed`, or `expired`. HTTP/transport/invalid-response errors during a wait also
+`failed`, `expired`, or `aborted`. The typed cancellation error preserves resumable
+metadata across supported Python versions rather than marking the task cancelled.
+HTTP/transport/invalid-response errors during a wait also
 retain the safe preparation ID for resumption.
 
 `Preparation` reports `queued`, `learning`, `validating`, `publishing`, `ready`,

@@ -5,6 +5,7 @@
 - Add explicit sync/async preparation, status polling, bounded waits, safe ready metadata and resumable errors.
 - Validate preparation responses strictly and isolate readiness from source-only generation caching.
 - Keep generation signatures, result frames and confirmed unbilled material-miss recovery unchanged.
+- Preserve typed resumable cancellation errors across supported Python versions.
 
 ## 1.1.5 — 2026-10-23
 

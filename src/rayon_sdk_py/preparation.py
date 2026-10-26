@@ -41,10 +41,10 @@ class PreparationError(RayonError):
         self.kind = kind
         self.preparation_id = preparation_id
 
-class PreparationCancelledError(asyncio.CancelledError):
+class PreparationCancelledError(PreparationError):
+    """Aborted client wait with resumable metadata across supported Python versions."""
     def __init__(self, preparation_id):
-        super().__init__('Rayon material preparation wait was cancelled.')
-        self.preparation_id = preparation_id
+        super().__init__('aborted', preparation_id)
 
 def validate_id(value, key=None):
     if not isinstance(value, str) or not _ID.fullmatch(value) or (key is not None and key in value):

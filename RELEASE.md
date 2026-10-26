@@ -52,3 +52,10 @@ and async preparation, exact full context, distinct idempotency keys, all states
 strict malformed-response rejection, bounded waits, cancellation isolation,
 transient GET recovery and unchanged generation billing/retry behavior. No SDK
 check or package build deploys the API. Publishing remains a maintainer action.
+
+
+Verify async wait cancellation on Python 3.10, 3.12 and 3.14. Cancellation of a
+preparation wait raises the typed `PreparationCancelledError(PreparationError)`
+with `kind="aborted"` and the safe preparation ID; it does not cancel the server
+job. Do not rely on `asyncio.CancelledError` subclass metadata surviving a Task
+boundary on every supported Python version.
