@@ -44,3 +44,11 @@ exact-case form families, telemetry-only body composition, transport mismatch re
 material reuse, and new public form types before publishing. Verify the six required
 headers with optional fresh same-family `a0`, original names and values, duplicate and
 incomplete-family rejection, and exactly six form fields with a larger `a` value.
+
+
+Version 2.0.0 is a coordinated backend release. Confirm `/v1/materials/prepare`
+and `/v1/materials/preparations/{id}` are deployed before publishing. Verify sync
+and async preparation, exact full context, distinct idempotency keys, all states,
+strict malformed-response rejection, bounded waits, cancellation isolation,
+transient GET recovery and unchanged generation billing/retry behavior. No SDK
+check or package build deploys the API. Publishing remains a maintainer action.

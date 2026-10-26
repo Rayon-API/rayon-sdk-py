@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0 — coordinated backend release
+
+- Add explicit sync/async preparation, status polling, bounded waits, safe ready metadata and resumable errors.
+- Validate preparation responses strictly and isolate readiness from source-only generation caching.
+- Keep generation signatures, result frames and confirmed unbilled material-miss recovery unchanged.
+
 ## 1.1.5 — 2026-10-23
 
 - Clarify generation failure and incomplete-result messages with conditional script-loader and support guidance.
