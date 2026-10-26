@@ -46,8 +46,14 @@ headers with optional fresh same-family `a0`, original names and values, duplica
 incomplete-family rejection, and exactly six form fields with a larger `a` value.
 
 
-Version 2.0.0 is a coordinated backend release. Confirm `/v1/materials/prepare`
-and `/v1/materials/preparations/{id}` are deployed before publishing. Verify sync
+Version 2.0.0 supports the available additive preparation API at
+`/v1/materials/prepare` and `/v1/materials/preparations/{preparation_id}`. Merge
+this postactivation release copy and publish only after the maintainer records
+backend and ingress GO. Ready requires validated complete output and Rust
+publication; partial output is not ready, and ready preparations execute only
+in Rust. The 30-day migration schedule is announced separately, with no fixed
+cutoff set here. This release does not enable mandatory prepared-only/Rust-only
+generation. Verify sync
 and async preparation, exact full context, distinct idempotency keys, all states,
 strict malformed-response rejection, bounded waits, cancellation isolation,
 transient GET recovery and unchanged generation billing/retry behavior. No SDK

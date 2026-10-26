@@ -2,8 +2,16 @@
 
 ## Explicit material preparation (2.0.0)
 
-This release is coordinated with the backend preparation API deployment. Availability
-must be confirmed before using these methods against a deployed API.
+The additive material preparation API is available through
+`POST /v1/materials/prepare` and
+`GET /v1/materials/preparations/{preparation_id}`. Explicitly prepare the full
+context and wait for ready before starting a workload. Ready requires complete
+output validation and Rust publication; partial output is not ready, and ready
+preparations execute only in Rust.
+
+The 30-day migration schedule will be announced separately. No fixed cutoff is
+set here, and mandatory prepared-only/Rust-only generation is not enabled by
+this release.
 
 ```python
 from rayon_sdk_py import Client, PreparationError

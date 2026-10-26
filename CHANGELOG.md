@@ -1,8 +1,9 @@
 # Changelog
 
-## 2.0.0 — coordinated backend release
+## 2.0.0 — explicit material preparation
 
-- Add explicit sync/async preparation, status polling, bounded waits, safe ready metadata and resumable errors.
+- Add explicit sync/async preparation, status polling, bounded waits, safe ready metadata and resumable errors for the available additive preparation API.
+- Document complete-output validation and Rust-only execution for ready preparations; keep mandatory prepared-only cutover disabled, with the 30-day migration schedule announced separately.
 - Validate preparation responses strictly and isolate readiness from source-only generation caching.
 - Keep generation signatures, result frames and confirmed unbilled material-miss recovery unchanged.
 - Preserve typed resumable cancellation errors across supported Python versions.
