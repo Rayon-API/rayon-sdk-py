@@ -1,5 +1,57 @@
 # Rayon Python SDK
 
+## Explicit material preparation (2.0.0)
+
+The additive material preparation API is available through
+`POST /v1/materials/prepare` and
+`GET /v1/materials/preparations/{preparation_id}`. Explicitly prepare the full
+context and wait for ready before starting a workload. Ready requires complete
+output validation and Rust publication; partial output is not ready, and ready
+preparations execute only in Rust.
+
+The 30-day migration schedule will be announced separately. No fixed cutoff is
+set here, and mandatory prepared-only/Rust-only generation is not enabled by
+this release.
+
+```python
+from rayon_sdk_py import Client, PreparationError
+
+with Client(api_key) as client:
+    job = client.prepare(shape)  # existing full ShapeRequest, no generation
+    try:
+        ready = client.wait_until_ready(job.preparation_id, wait_timeout=60)
+    except PreparationError as error:
+        # Safe ID can resume an existing job later; timeout does not cancel it.
+        preparation_id = error.preparation_id
+        raise
+    current = client.get_preparation(ready.preparation_id)
+    # Or explicitly combine creation and waiting:
+    ready = client.prepare_and_wait(shape, wait_timeout=60)
+```
+
+`AsyncClient` exposes the same four methods with `await`. Cancelling an async wait
+raises `PreparationCancelledError` (a `PreparationError` with `kind="aborted"`) with a safe
+`preparation_id`; the server job continues. `PreparationError.kind` is `timeout`,
+`failed`, `expired`, or `aborted`. The typed cancellation error preserves resumable
+metadata across supported Python versions rather than marking the task cancelled.
+HTTP/transport/invalid-response errors during a wait also
+retain the safe preparation ID for resumption.
+
+`Preparation` reports `queued`, `learning`, `validating`, `publishing`, `ready`,
+`failed`, or `expired`. A successful wait returns `ReadyMaterial`: safe metadata
+including the reusable `material_ref`, material expiry, `ready_until`, and the
+confirmed `rust` execution backend. It contains no scripts, cookies, or generated
+headers. Readiness is scoped to the exact supplied request/profile/cookie/mode/form
+context and its lifetime; use the current full context when preparing again.
+
+Preparation is opt-in. `generate()` keeps its existing signature and result and
+never creates a preparation job or waits for learning. Preparation does not reuse
+or populate the source-only generation cache, and independent full contexts are
+never coalesced. Each prepare invocation uses a fresh `Idempotency-Key`; the SDK
+does not retry ambiguous POST results. Waiting uses bounded long polling and
+jittered retries for transient GET failures under a monotonic time budget.
+
+
 Generate Shape headers or form telemetry and read account usage. Keep your API
 key server-side. Your integration owns its HTTP client or browser and target session.
 
@@ -10,7 +62,7 @@ key server-side. Your integration owns its HTTP client or browser and target ses
 ## Install
 
 ```sh
-python -m pip install 'rayon-sdk-py>=1.1.4,<2'
+python -m pip install 'rayon-sdk-py>=2.0.0,<3'
 ```
 
 ## Check usage, then generate
@@ -61,7 +113,7 @@ and `InvalidResponseError`. Available metadata includes `status_code`,
 `billing_status` and `retryable`.
 
 The default API URL is `https://api.rayonapi.com`; default timeout is 45 seconds.
-Keep one client open across calls. Python and JavaScript SDK 1.1.4 reuse material
+Keep one client open across calls. Python and JavaScript SDK 2.0.0 reuse material
 in both modes while generating fresh telemetry for each request. Read the
 [material and recovery policy](https://docs.rayonapi.com/material#reuse-material-not-headers)
 for cache scope, limits and the single confirmed uncharged material recovery.

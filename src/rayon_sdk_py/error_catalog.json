@@ -364,8 +364,8 @@
     "codes": [
       "daily_quota_exceeded"
     ],
-    "message": "The request could not be completed.",
-    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "message": "A legacy daily request cap rejected this request.",
+    "action": "Contact support with the request ID. This cap is separate from your weekly allowance and wallet balance.",
     "retryable": false
   },
   "durable_redis_required": {
@@ -508,8 +508,8 @@
     "codes": [
       "monthly_quota_exceeded"
     ],
-    "message": "The request could not be completed.",
-    "action": "Contact support with the request ID. Check request history before sending another request.",
+    "message": "A legacy monthly request cap rejected this request.",
+    "action": "Contact support with the request ID. This cap is separate from your weekly allowance and wallet balance.",
     "retryable": false
   },
   "native_build_mismatch": {
@@ -550,6 +550,86 @@
     ],
     "message": "The request could not be completed.",
     "action": "Contact support with the request ID. Check request history before sending another request.",
+    "retryable": false
+  },
+  "material_not_prepared": {
+    "codes": [
+      "material_not_prepared"
+    ],
+    "message": "This material is not ready for Rust generation.",
+    "action": "Prepare the material and wait for ready before generating.",
+    "retryable": false
+  },
+  "material_learning": {
+    "codes": [
+      "material_learning"
+    ],
+    "message": "This material is being prepared.",
+    "action": "Wait for the preparation operation to become ready.",
+    "retryable": false
+  },
+  "prepared_material_expired": {
+    "codes": [
+      "prepared_material_expired"
+    ],
+    "message": "The prepared material is no longer ready.",
+    "action": "Prepare the current material again before generating.",
+    "retryable": false
+  },
+  "idempotency_conflict": {
+    "codes": [
+      "idempotency_conflict"
+    ],
+    "message": "This idempotency key was used for different preparation input.",
+    "action": "Use the original input or a new idempotency key.",
+    "retryable": false
+  },
+  "preparation_unavailable": {
+    "codes": [
+      "preparation_unavailable"
+    ],
+    "message": "Material preparation is temporarily unavailable.",
+    "action": "Check preparation status or try preparation again shortly.",
+    "retryable": false
+  },
+  "preparation_failed": {
+    "codes": [
+      "preparation_failed"
+    ],
+    "message": "Material preparation did not succeed.",
+    "action": "Check the supported material and context before preparing again.",
+    "retryable": false
+  },
+  "preparation_expired": {
+    "codes": [
+      "preparation_expired"
+    ],
+    "message": "The preparation has expired.",
+    "action": "Prepare current material again.",
+    "retryable": false
+  },
+  "preparation_unauthorized": {
+    "codes": [
+      "preparation_unauthorized"
+    ],
+    "message": "Access to this preparation is no longer authorized.",
+    "action": "Check API key and domain access.",
+    "retryable": false
+  },
+  "preparation_timeout": {
+    "codes": [
+      "preparation_timeout"
+    ],
+    "message": "Material preparation exceeded its deadline.",
+    "action": "Check preparation status before starting another operation.",
+    "retryable": false
+  },
+  "preparation_interrupted": {
+    "codes": [
+      "preparation_interrupted"
+    ],
+    "message": "Material preparation was interrupted.",
+    "action": "Check preparation status and prepare again if needed.",
     "retryable": false
   }
 }

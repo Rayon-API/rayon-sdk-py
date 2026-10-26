@@ -22,8 +22,9 @@ from .errors import (
     InvalidResponseError,
 )
 
-__version__ = "1.1.5"
+__version__ = "2.0.0"
 __all__ = [
+    "Preparation", "ReadyMaterial", "PreparationError", "PreparationCancelledError",
     "Client",
     "AsyncClient",
     "generate",
@@ -44,3 +45,5 @@ __all__ = [
     "MigrationError",
     "InvalidResponseError",
 ]
+
+from .preparation import Preparation, ReadyMaterial, PreparationError, PreparationCancelledError

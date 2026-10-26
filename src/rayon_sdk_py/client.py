@@ -5,6 +5,7 @@ import time
 import threading
 from datetime import datetime
 from typing import Any, overload
+from .preparation import SyncPreparation, AsyncPreparation, strict_loads
 from .models import ShapeRequest, ShapeResult, FormShapeResult, FormShapeRequest
 from curl_cffi import CurlOpt, requests
 from curl_cffi.curl import CURL_WRITEFUNC_ERROR
@@ -163,11 +164,11 @@ class _BaseClient:
             options["json"] = body
         return options, content, state
 
-    def _decode(self, response, content, state):
+    def _decode(self, response, content, state, *, preparation=False):
         if state["oversized"]:
             raise InvalidResponseError("Rayon API response exceeded the 256 KiB limit.")
         try:
-            body = json.loads(bytes(content))
+            body = strict_loads(content) if preparation else json.loads(bytes(content))
         except (ValueError, UnicodeError, RecursionError):
             body = None
         metadata = response_metadata(response, self._api_key, body)
@@ -175,7 +176,7 @@ class _BaseClient:
             raise RedirectError(
                 "Rayon API returned a redirect; no redirect was followed.", **metadata
             )
-        if response.status_code != 200:
+        if response.status_code != 200 and not (preparation == "POST" and response.status_code == 202):
             raise HTTPError(
                 "Rayon API returned an unsuccessful HTTP status.", **metadata
             )
@@ -191,7 +192,7 @@ class _BaseClient:
         raise TransportError("Rayon API request could not be completed.") from None
 
 
-class Client(_BaseClient):
+class Client(SyncPreparation, _BaseClient):
     """Persistent ordinary-TLS API session. Use as a context manager or close explicitly."""
 
     def __init__(
@@ -219,10 +220,12 @@ class Client(_BaseClient):
             self._clear_material()
             self._session.close()
 
-    def _send(self, method, path, body=None, *, timeout=None):
+    def _send(self, method, path, body=None, *, timeout=None, headers=None, preparation=False):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         options, content, state = self._options(body)
+        if headers:
+            options["headers"].update(headers)
         budget = self._timeout if timeout is None else timeout
         if budget <= 0:
             raise TransportError("Rayon API request could not be completed.")
@@ -234,7 +237,7 @@ class Client(_BaseClient):
             failed = True
         if failed:
             self._failed(state)
-        return self._decode(response, content, state)
+        return self._decode(response, content, state, preparation=method if preparation else False)
 
     @overload
     def generate(self, shape: ShapeRequest) -> ShapeResult: ...
@@ -278,7 +281,7 @@ class Client(_BaseClient):
         return value
 
 
-class AsyncClient(_BaseClient):
+class AsyncClient(AsyncPreparation, _BaseClient):
     """Persistent asynchronous session. Use async with or await aclose()."""
 
     def __init__(
@@ -306,10 +309,12 @@ class AsyncClient(_BaseClient):
             self._clear_material()
             await self._session.close()
 
-    async def _send(self, method, path, body=None, *, timeout=None):
+    async def _send(self, method, path, body=None, *, timeout=None, headers=None, preparation=False):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         options, content, state = self._options(body)
+        if headers:
+            options["headers"].update(headers)
         budget = self._timeout if timeout is None else timeout
         if budget <= 0:
             raise TransportError("Rayon API request could not be completed.")
@@ -321,7 +326,7 @@ class AsyncClient(_BaseClient):
             response = await self._session.request(
                 method, self._base_url + path, **options
             )
-            decoded = self._decode(response, content, state)
+            decoded = self._decode(response, content, state, preparation=method if preparation else False)
             if loop.time() >= deadline:
                 raise asyncio.TimeoutError
             return decoded
