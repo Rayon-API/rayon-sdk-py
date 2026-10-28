@@ -143,7 +143,7 @@ def _result(value):
 
 class SyncPreparation:
     def prepare(self, shape: ShapeRequest | FormShapeRequest) -> Preparation:
-        body = validate_shape(shape)
+        body = validate_shape(shape, require_material=True)
         value, metadata = self._send('POST', '/v1/materials/prepare', body,
             headers={'Idempotency-Key': uuid.uuid4().hex}, preparation=True)
         return parse_preparation(value, metadata, self._api_key)
@@ -190,7 +190,7 @@ class SyncPreparation:
 
 class AsyncPreparation:
     async def prepare(self, shape: ShapeRequest | FormShapeRequest) -> Preparation:
-        body = validate_shape(shape)
+        body = validate_shape(shape, require_material=True)
         value, metadata = await self._send('POST', '/v1/materials/prepare', body,
             headers={'Idempotency-Key': uuid.uuid4().hex}, preparation=True)
         return parse_preparation(value, metadata, self._api_key)

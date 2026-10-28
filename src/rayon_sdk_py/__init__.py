@@ -1,4 +1,4 @@
-"""Material-only Rayon API clients."""
+"""Synchronous and asynchronous Rayon API clients."""
 
 from .client import Client, AsyncClient, generate
 from .validation import validate_profile
@@ -22,7 +22,7 @@ from .errors import (
     InvalidResponseError,
 )
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 __all__ = [
     "Preparation", "ReadyMaterial", "PreparationError", "PreparationCancelledError",
     "Client",

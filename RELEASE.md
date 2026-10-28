@@ -45,23 +45,11 @@ material reuse, and new public form types before publishing. Verify the six requ
 headers with optional fresh same-family `a0`, original names and values, duplicate and
 incomplete-family rejection, and exactly six form fields with a larger `a` value.
 
+## Managed-material release gate
 
-Version 2.0.0 supports the available additive preparation API at
-`/v1/materials/prepare` and `/v1/materials/preparations/{preparation_id}`. Merge
-this postactivation release copy and publish only after the maintainer records
-backend and ingress GO. Ready requires validated complete output and Rust
-publication; partial output is not ready, and ready preparations execute only
-in Rust. The 30-day migration schedule is announced separately, with no fixed
-cutoff set here. This release does not enable mandatory prepared-only/Rust-only
-generation. Verify sync
-and async preparation, exact full context, distinct idempotency keys, all states,
-strict malformed-response rejection, bounded waits, cancellation isolation,
-transient GET recovery and unchanged generation billing/retry behavior. No SDK
-check or package build deploys the API. Publishing remains a maintainer action.
-
-
-Verify async wait cancellation on Python 3.10, 3.12 and 3.14. Cancellation of a
-preparation wait raises the typed `PreparationCancelledError(PreparationError)`
-with `kind="aborted"` and the safe preparation ID; it does not cancel the server
-job. Do not rely on `asyncio.CancelledError` subclass metadata surviving a Task
-boundary on every supported Python version.
+Candidate: 2.1.0. Verify managed header generation, explicit uploads/references,
+materialless-preparation rejection, safe fallback metadata and all existing
+preparation/cancellation tests. Check package contents and a clean consumer.
+Publish only after the maintainer approves the API contract and release report.
+Keep Go's `/v2` import path. Publish core JS before the Playwright adapter, then
+examples and docs. Local builds do not publish packages or deploy services.

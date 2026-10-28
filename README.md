@@ -1,128 +1,118 @@
 # Rayon Python SDK
 
-## Explicit material preparation (2.0.0)
+Rayon manages current material for supported public sources. Send the source-page
+URL, profile and exact request. No script collection or preparation is needed for
+this header flow. Replace the reserved example URLs with your approved source and
+endpoint. `{}` uses default profile values; supply measured values when needed.
 
-The additive material preparation API is available through
-`POST /v1/materials/prepare` and
-`GET /v1/materials/preparations/{preparation_id}`. Explicitly prepare the full
-context and wait for ready before starting a workload. Ready requires complete
-output validation and Rust publication; partial output is not ready, and ready
-preparations execute only in Rust.
-
-The 30-day migration schedule will be announced separately. No fixed cutoff is
-set here, and mandatory prepared-only/Rust-only generation is not enabled by
-this release.
-
-```python
-from rayon_sdk_py import Client, PreparationError
-
-with Client(api_key) as client:
-    job = client.prepare(shape)  # existing full ShapeRequest, no generation
-    try:
-        ready = client.wait_until_ready(job.preparation_id, wait_timeout=60)
-    except PreparationError as error:
-        # Safe ID can resume an existing job later; timeout does not cancel it.
-        preparation_id = error.preparation_id
-        raise
-    current = client.get_preparation(ready.preparation_id)
-    # Or explicitly combine creation and waiting:
-    ready = client.prepare_and_wait(shape, wait_timeout=60)
-```
-
-`AsyncClient` exposes the same four methods with `await`. Cancelling an async wait
-raises `PreparationCancelledError` (a `PreparationError` with `kind="aborted"`) with a safe
-`preparation_id`; the server job continues. `PreparationError.kind` is `timeout`,
-`failed`, `expired`, or `aborted`. The typed cancellation error preserves resumable
-metadata across supported Python versions rather than marking the task cancelled.
-HTTP/transport/invalid-response errors during a wait also
-retain the safe preparation ID for resumption.
-
-`Preparation` reports `queued`, `learning`, `validating`, `publishing`, `ready`,
-`failed`, or `expired`. A successful wait returns `ReadyMaterial`: safe metadata
-including the reusable `material_ref`, material expiry, `ready_until`, and the
-confirmed `rust` execution backend. It contains no scripts, cookies, or generated
-headers. Readiness is scoped to the exact supplied request/profile/cookie/mode/form
-context and its lifetime; use the current full context when preparing again.
-
-Preparation is opt-in. `generate()` keeps its existing signature and result and
-never creates a preparation job or waits for learning. Preparation does not reuse
-or populate the source-only generation cache, and independent full contexts are
-never coalesced. Each prepare invocation uses a fresh `Idempotency-Key`; the SDK
-does not retry ambiguous POST results. Waiting uses bounded long polling and
-jittered retries for transient GET failures under a monotonic time budget.
-
-
-Generate Shape headers or form telemetry and read account usage. Keep your API
-key server-side. Your integration owns its HTTP client or browser and target session.
+Keep the API key server-side. Your integration owns the target HTTP client,
+authentication, cookies and session. Rayon generates telemetry; your client sends
+the target request.
 
 [Quickstart](https://docs.rayonapi.com/quickstart) ·
-[SDK guide](https://github.com/Rayon-API/docs/blob/main/guide/python.md) ·
-[All SDKs](https://docs.rayonapi.com/sdks)
+[Material options](https://docs.rayonapi.com/material) ·
+[API reference](https://docs.rayonapi.com/api-reference)
 
 ## Install
 
+Requires Python 3.10+.
+
 ```sh
-python -m pip install 'rayon-sdk-py>=2.0.0,<3'
+python -m pip install 'rayon-sdk-py>=2.1.0,<3'
 ```
 
-## Check usage, then generate
-
-Set `RAYON_API_KEY`. Prepare `shape.json` using the
-[input guide](https://docs.rayonapi.com/material): source-page URL, complete ordered
-script sources, a profile object and the exact target request. Include browser
-measurements or JavaScript-visible cookies only when your flow requires them.
+## Generate
 
 ```python
-import json
 import os
-from pathlib import Path
 from rayon_sdk_py import Client
 
+shape = {
+    "source_url": "https://shop.example.com/account",
+    "profile": {},
+    "request": {
+        "url": "https://shop.example.com/api/check",
+        "method": "POST",
+        "content_type": "application/json",
+        "body": "{}",
+    },
+}
 with Client(os.environ["RAYON_API_KEY"]) as client:
-    usage = client.usage()  # Free; no generation quota used.
-    print(usage)
-    shape = json.loads(Path("shape.json").read_text(encoding="utf-8"))
     result = client.generate(shape)
-    # Apply result.headers using your existing target client/session.
-    # Reuse client here for further requests with their current inputs.
-    print(result.request_id)
+    if result.fallback_reason:
+        print("A fallback was used. Contact support with request ID:", result.request_id)
+    # Apply result.headers with your target client. Keep client open for further calls.
 ```
 
-Apply the entire returned header map unchanged, including optional `a0`, to that
-exact request. Keep required application headers, authentication and session state
-in your target client. RayonAPI does not download scripts, send the target request
-or return target cookies. Inspect the target response to establish acceptance.
+Use `AsyncClient` with `async with` and `await client.generate(shape)` in async
+applications. Both clients accept the same inputs and return the same metadata.
 
-## Form telemetry
+Apply every returned header unchanged, including optional `a0`, to the exact
+request. Header names may use a hyphen before the suffix or a compact prefix; preserve them exactly. Keep application headers and session state in your target client.
+Generate fresh telemetry for each request and inspect the target response to
+check acceptance. Rayon returns no target cookies.
 
-For observed URL-encoded form telemetry, use `mode: "form"` and supply the exact
-application body before telemetry insertion. The result has `form_fields` and
-`form_body`, without generated headers. Prepend `form_body` once to the original
-body, preserving its bytes, duplicate fields and encoding. See
-[Form payload integration](https://docs.rayonapi.com/form-payload-integration)
-for complete examples.
+## Fallback reporting
+
+When `fallback_reason` is present and non-null, a fallback was used. Contact
+support with `request_id` about the mapping issue. `fallback_message` provides
+safe guidance when available. Do not infer fallback from timing alone.
+
+Results also expose optional `path`, `material_reuse`, `discovery_state` and
+`discovery_duration_ms`. Older responses can omit these fields.
+
+## Optional material and preparation
+
+For an explicit override, supply either `scripts` (complete ordered sources) or
+`material_ref` (a private reference), never both. Omit the unused field; null and
+empty values are invalid. Customer uploads and references remain private to the
+API key. For an inline script, set `inline: true` and use the document URL; omit the flag for external scripts. Automatic requests should keep both fields omitted on every call so
+new public material can be selected.
+
+Form mode still requires explicit material. Set `mode: "form"`, supply the exact
+URL-encoded POST application body before telemetry insertion, and prepend the
+returned `form_body` once. It contains telemetry only. Preserve duplicate fields
+and encoding. See [form integration](https://docs.rayonapi.com/form-payload-integration).
+
+Preparation is optional for explicit material. It checks the supplied context
+before a workload; it is separate from managed selection and generation.
+Usable validated mappings can be ready without every internal record being mapped.
+Generated headers and form fields must still pass output validation.
+
+```python
+# explicit_shape includes scripts or material_ref and the current full context.
+ready = client.prepare_and_wait(explicit_shape, wait_timeout=60)
+current = {k: v for k, v in explicit_shape.items() if k not in ("scripts", "material_ref")}
+result = client.generate({**current, "material_ref": ready.material_ref})
+```
+
+Sync and async clients retain `prepare`, `get_preparation`, `wait_until_ready`
+and `prepare_and_wait`. Waits default to 60 seconds; status long polls accept
+0–10 seconds. `Preparation` exposes states and `ReadyMaterial` confirms readiness.
+Timeout/cancellation leaves the server job running. `PreparationError` retains
+`preparation_id` and a `kind` of `timeout`, `failed`, `expired` or `aborted`.
+Async cancellation raises `PreparationCancelledError`, retaining the resumable ID.
+Readiness expires separately from the source reference; prepare current explicit
+context again after expiry or relevant input changes.
 
 ## Client options and errors
 
-Requires Python 3.10+. Use `AsyncClient` with `async with`,
-`await client.usage()` and `await client.generate(shape)` in async applications.
-Set `timeout=45` in the constructor to set the API timeout.
+Reuse one client for connections. `usage()` is a free access/allowance check.
+Default API URL: `https://api.rayonapi.com`; timeout: 45 seconds. Set `base_url`
+or `timeout` in the constructor. Use `validate_profile` for offline validation.
+
 Errors inherit `RayonError`: `ValidationError`, `TransportError`, `HTTPError`
-and `InvalidResponseError`. Available metadata includes `status_code`,
-`request_id`, `code`, `retry_after`, `reason`, `action`, `domain`, `field`,
-`billing_status` and `retryable`.
+and `InvalidResponseError`. Metadata includes `status_code`, `request_id`,
+`code`, `retry_after`, `reason`, `action`, `domain`, `field`, `billing_status`
+and `retryable` when available. Check request history before retrying a timeout
+or uncertain billing outcome. Only a definite uncharged `material_expired`
+receives one recovery attempt, while original explicit sources remain retained.
+No other generation error is automatically retried.
 
-The default API URL is `https://api.rayonapi.com`; default timeout is 45 seconds.
-Keep one client open across calls. Python and JavaScript SDK 2.0.0 reuse material
-in both modes while generating fresh telemetry for each request. Read the
-[material and recovery policy](https://docs.rayonapi.com/material#reuse-material-not-headers)
-for cache scope, limits and the single confirmed uncharged material recovery.
+Explicit-source caching retains up to 128 bundles / 16 MiB per client, coalesces
+uploads and refreshes near expiry. References last up to five minutes and may
+expire earlier. Automatic generation never pins a returned reference. The SDK
+does not fetch target scripts, send target requests or cache generated telemetry.
 
-Check request history before resubmitting after a timeout or uncertain billing
-outcome. See [errors and retry guidance](https://docs.rayonapi.com/errors),
-[request fields](https://docs.rayonapi.com/api-reference) and
-[browser/session inputs](https://docs.rayonapi.com/profiles-and-sessions).
-The [Python download helper](https://github.com/Rayon-API/rayon-examples) is optional.
-
-[Support](mailto:support@rayonapi.com) ·
-[Releases](https://github.com/Rayon-API/rayon-sdk-py/releases) · [MIT license](LICENSE)
+[Errors](https://docs.rayonapi.com/errors) · [Release instructions](RELEASE.md) ·
+[Support](mailto:support@rayonapi.com) · [MIT license](LICENSE)

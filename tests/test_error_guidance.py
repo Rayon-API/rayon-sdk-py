@@ -10,7 +10,7 @@ def test_incomplete_generation_explains_loader_and_support_without_assigning_fau
                     reason='generation_incomplete',billing_status='pending',retryable=False)
     assert str(error)=='Generation did not complete.'
     assert 'loader' in error.action
-    assert 'If all required scripts were supplied' in error.action
+    assert 'For managed material, contact support with the request ID' in error.action
     assert error.retryable is False
 
 KEY = "test-secret-key"
