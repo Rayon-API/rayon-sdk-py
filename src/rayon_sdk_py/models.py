@@ -87,7 +87,7 @@ class FormMetadata(TypedDict, total=False):
 
 
 class ShapeRequest(_ShapeRequired, total=False):
-    """Provide exactly one of scripts and material_ref."""
+    """Omit material for managed header generation, or supply one explicit input."""
 
     scripts: list[ScriptMaterial]
     material_ref: str
@@ -117,6 +117,13 @@ class ShapeResult:
     material_ref: str = field(repr=False)
     material_expires_at: str
 
+    path: Literal["native", "isolated"] | None = None
+    material_reuse: bool | None = None
+    discovery_duration_ms: float | None = None
+    discovery_state: str | None = None
+    fallback_reason: str | None = None
+    fallback_message: str | None = field(default=None, repr=False)
+
 
 @dataclass(frozen=True)
 class FormShapeResult:
@@ -127,3 +134,10 @@ class FormShapeResult:
     profile_used: dict[str, Any] = field(repr=False)
     material_ref: str = field(repr=False)
     material_expires_at: str
+
+    path: Literal["native", "isolated"] | None = None
+    material_reuse: bool | None = None
+    discovery_duration_ms: float | None = None
+    discovery_state: str | None = None
+    fallback_reason: str | None = None
+    fallback_message: str | None = field(default=None, repr=False)

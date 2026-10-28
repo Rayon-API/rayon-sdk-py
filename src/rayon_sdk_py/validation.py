@@ -450,7 +450,7 @@ def safe_form_fields(fields, body):
     return fields
 
 
-def validate_shape(value):
+def validate_shape(value, *, require_material=False):
     try:
         v = json_copy(value)
         if (
@@ -469,7 +469,8 @@ def validate_shape(value):
             }
         ):
             raise ValueError
-        if not valid_url(v["source_url"]) or ("scripts" in v) == ("material_ref" in v):
+        if (not valid_url(v["source_url"]) or ("scripts" in v and "material_ref" in v)
+                or ((require_material or v.get("mode") == "form") and "scripts" not in v and "material_ref" not in v)):
             raise ValueError
         if "scripts" in v:
             if not isinstance(v["scripts"], list) or not 1 <= len(v["scripts"]) <= 16:
@@ -486,9 +487,9 @@ def validate_shape(value):
                     raise ValueError
             if sum(len(s["source"].encode()) for s in v["scripts"]) > 3 * 1024 * 1024:
                 raise ValueError
-        elif not isinstance(v["material_ref"], str) or not re.fullmatch(
+        elif "material_ref" in v and (not isinstance(v["material_ref"], str) or not re.fullmatch(
             r"[A-Za-z0-9_-]{16,128}", v["material_ref"]
-        ):
+        )):
             raise ValueError
         v["profile"] = validate_profile(v["profile"])
         r = v["request"]
@@ -592,6 +593,26 @@ def response_metadata(response, api_key, body=None):
     )
 
 
+def operation_metadata(value, api_key):
+    result = {}
+    for name in ("path", "material_reuse", "discovery_duration_ms", "discovery_state", "fallback_reason", "fallback_message"):
+        if name not in value:
+            continue
+        v = value[name]
+        if name == "path":
+            if v not in ("native", "isolated"): raise ValueError
+        elif name == "material_reuse":
+            if type(v) is not bool: raise ValueError
+        elif name == "discovery_duration_ms":
+            if v is not None and (type(v) not in (int, float) or not 0 <= v <= 3600000): raise ValueError
+        elif name == "fallback_message":
+            if not isinstance(v, str) or len(v) > 512 or any(not 32 <= ord(c) <= 126 for c in v) or api_key in v: raise ValueError
+        elif v is not None and (not isinstance(v, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", v) or api_key in v):
+            raise ValueError
+        result[name] = v
+    return result
+
+
 def parse_result(body, metadata, api_key, mode="header"):
     try:
         v = json_copy(body)
@@ -656,6 +677,7 @@ def parse_result(body, metadata, api_key, mode="header"):
                 is None
             ):
                 raise ValueError
+        operation = operation_metadata(v, api_key)
         if mode == "form":
             return FormShapeResult(
                 fields,
@@ -665,9 +687,10 @@ def parse_result(body, metadata, api_key, mode="header"):
                 v["profile_used"],
                 ref,
                 expiry,
+                **operation,
             )
         return ShapeResult(
-            headers, v["request_id"], v["generation_ms"], v["profile_used"], ref, expiry
+            headers, v["request_id"], v["generation_ms"], v["profile_used"], ref, expiry, **operation
         )
     except (ValueError, TypeError, RecursionError, OverflowError, UnicodeError):
         raise InvalidResponseError(

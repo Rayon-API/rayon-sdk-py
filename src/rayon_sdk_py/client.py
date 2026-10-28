@@ -51,7 +51,7 @@ class _BaseClient:
                 [body["source_url"], scripts], sort_keys=True,
                 ensure_ascii=False, separators=(",", ":"),
             ).encode()).hexdigest()
-        else:
+        elif "material_ref" in body:
             with self._material_lock:
                 for candidate, cached in self._cache.items():
                     if (cached["ref"] == body["material_ref"]
