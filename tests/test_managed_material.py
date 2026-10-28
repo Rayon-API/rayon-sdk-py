@@ -54,19 +54,3 @@ def test_nullable_metadata_and_zero_duration(transport):
     with sdk.Client(KEY) as client:
         response=client.generate(managed())
         assert response.discovery_duration_ms == 0 and response.fallback_reason is None
-
-@pytest.mark.parametrize("suffixes", [list("abcdfz"), [*"abcdfz","a0"]])
-def test_compact_header_family(transport, suffixes):
-    headers={f"Compact{s}":"" if s == "d" else "value" for s in suffixes}
-    transport["body"] = result(headers=headers)
-    with sdk.Client(KEY) as client: assert client.generate(managed()).headers == headers
-
-def test_inline_material_stays_distinct_in_cache(transport):
-    with sdk.Client(KEY) as client:
-        for inline in [False,True]:
-            value=shape();value["scripts"][0]["inline"]=inline
-            client.generate(value)
-        for inline in [None,1,"true"]:
-            value=shape();value["scripts"][0]["inline"]=inline
-            with pytest.raises(sdk.ValidationError):client.generate(value)
-    assert [options["json"]["scripts"][0]["inline"] for _,_,options in transport["calls"]] == [False,True]

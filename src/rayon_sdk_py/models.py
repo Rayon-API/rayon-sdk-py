@@ -2,13 +2,9 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, TypedDict
 
 
-class _ScriptRequired(TypedDict):
+class ScriptMaterial(TypedDict):
     url: str
     source: str
-
-
-class ScriptMaterial(_ScriptRequired, total=False):
-    inline: bool
 
 
 class ScreenProfile(TypedDict, total=False):

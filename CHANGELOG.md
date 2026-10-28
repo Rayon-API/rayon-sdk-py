@@ -4,7 +4,6 @@
 
 - Allow omitted material for managed header generation; preserve explicit overrides and preparation.
 - Keep automatic selection current across repeated requests and material changes.
-- Support optional inline script markers and preserve separated or compact header families, including a0.
 - Expose safe fallback and operation metadata. Keep existing retry, privacy and output validation.
 
 ## 2.0.0 — explicit material preparation

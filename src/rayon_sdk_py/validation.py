@@ -478,9 +478,7 @@ def validate_shape(value, *, require_material=False):
             for s in v["scripts"]:
                 if (
                     not isinstance(s, dict)
-                    or not {"url", "source"} <= s.keys()
-                    or not s.keys() <= {"url", "source", "inline"}
-                    or ("inline" in s and type(s["inline"]) is not bool)
+                    or s.keys() != {"url", "source"}
                     or not valid_url(s["url"])
                     or not isinstance(s["source"], str)
                     or not s["source"]
@@ -644,7 +642,7 @@ def parse_result(body, metadata, api_key, mode="header"):
             suffixes = []
             for name, value in headers.items():
                 m = re.fullmatch(
-                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128}-?)(a0|[abcdfz])",
+                    r"([!#$%&'*+\-.^_`|~0-9A-Za-z]{1,128})-(a0|[abcdfz])",
                     name,
                     re.I | re.ASCII,
                 )
