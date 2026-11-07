@@ -15,7 +15,7 @@ the target request.
 
 ## Install
 
-This is an unpublished release candidate for the preparation-required server contract.
+Release candidate for the preparation-required server contract.
 Deploy the compatible server before migrating clients.
 
 Requires Python 3.10+.
