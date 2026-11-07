@@ -15,9 +15,7 @@ URL = "https://example.com/page"
 def shape(**changes):
     value = dict(
         source_url=URL,
-        scripts=[
-            dict(url="https://example.com/owned.js", source="/* owned material */")
-        ],
+        material_ref="ref_0123456789abcdef",
         profile={"language": "en-GB"},
         request=dict(
             url=URL,
@@ -27,6 +25,14 @@ def shape(**changes):
         ),
         document_cookie="session=current",
     )
+    value.update(changes)
+    return value
+
+
+def explicit_shape(**changes):
+    value = shape()
+    value.pop("material_ref")
+    value["scripts"] = [dict(url="https://example.com/owned.js", source="/* owned material */")]
     value.update(changes)
     return value
 
@@ -238,13 +244,12 @@ def test_bounded_response_and_redacted_transport(transport):
     assert KEY not in repr(caught.value)
 
 
-def test_expired_and_distinct_material_never_reuse_ref(transport):
-    transport["body"] = result(material_expires_at="2000-01-01T00:00:00Z")
+def test_expired_reference_does_not_change_generation_to_upload(transport):
+    transport.update(status=422, body={"error":{"code":"material_expired","billing_status":"not_charged"}})
     with sdk.Client(KEY) as client:
-        client.generate(shape())
-        client.generate(shape())
-        client.generate(shape(scripts=[{"url": URL, "source": "/* different */"}]))
-    assert all("scripts" in call[2]["json"] for call in transport["calls"])
+        with pytest.raises(sdk.HTTPError): client.generate(shape())
+    assert len(transport["calls"]) == 1
+    assert "scripts" not in transport["calls"][0][2]["json"]
 
 
 def test_generation_clients_and_helper_exported():

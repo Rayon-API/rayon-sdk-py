@@ -472,6 +472,8 @@ def validate_shape(value, *, require_material=False):
         if (not valid_url(v["source_url"]) or ("scripts" in v and "material_ref" in v)
                 or ((require_material or v.get("mode") == "form") and "scripts" not in v and "material_ref" not in v)):
             raise ValueError
+        if "scripts" in v and not require_material:
+            raise ValueError("Scripts must be submitted to preparation, not generation")
         if "scripts" in v:
             if not isinstance(v["scripts"], list) or not 1 <= len(v["scripts"]) <= 16:
                 raise ValueError

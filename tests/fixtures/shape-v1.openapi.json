@@ -1,0 +1,1879 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Rayon API",
+    "version": "3.0.0-rc.1",
+    "description": "Generate telemetry using ready managed material or a ready private reference. Custom sources must complete preparation first. Readiness, supported inputs and reference expiry are enforced independently. Preparation is separately bounded and uncharged. Validation, capacity and failed generation do not spend generation credits."
+  },
+  "servers": [
+    {
+      "url": "https://api.rayonapi.com"
+    }
+  ],
+  "paths": {
+    "/v1/shape": {
+      "post": {
+        "summary": "Generate Shape telemetry with managed or explicit material",
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShapeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "unauthorized",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "access_denied with account, policy or domain reason; existing policies_required and domain_not_approved codes remain valid",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "access_denied",
+                    "message": "Access to api.example.com has not been approved.",
+                    "request_id": "00000000-0000-4000-8000-000000000001",
+                    "retryable": false,
+                    "reason": "domain_not_approved",
+                    "action": "Request access to this domain in your dashboard.",
+                    "domain": "api.example.com",
+                    "field": "request.url",
+                    "billing_status": "not_charged"
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "input_too_large",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "unsupported_encoding or unsupported_media_type",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_input, unsupported_profile, unsupported_material, material_expired, generation_failed, generation_incomplete, generation_invalid_headers, generation_invalid_form or output_too_large. Known worker failure codes are preserved. Read message/action for guidance and retain request_id; a generation failure alone does not establish incorrect client input.",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited: slow requests; concurrency_exceeded: reduce in-flight requests; capacity_exceeded: wait for service capacity. Respect Retry-After.",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "concurrency_exceeded",
+                    "message": "Too many requests are running at once.",
+                    "request_id": "00000000-0000-4000-8000-000000000001",
+                    "retryable": true,
+                    "action": "Wait for running requests to finish, then retry.",
+                    "billing_status": "not_charged"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "credits_warming: temporary credit preparation, retryable true with Retry-After: 1; or generation_unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Retry-After": {
+                "description": "Delay in seconds; 1 for credits_warming.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "credits_warming",
+                    "message": "Your credits are being prepared.",
+                    "request_id": "00000000-0000-4000-8000-000000000001",
+                    "retryable": true,
+                    "action": "Wait a moment, then retry. Contact support if this continues.",
+                    "billing_status": "not_charged"
+                  }
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "generation_timeout",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Generated telemetry for the requested header or form mode; target acceptance is not verified.",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShapeResponse"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "input_timeout; upload deadline exceeded without generation charge",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "insufficient_credits: top up the wallet or wait for allowance renewal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": {
+                    "code": "insufficient_credits",
+                    "message": "No available allowance or sufficient wallet balance remains.",
+                    "request_id": "00000000-0000-4000-8000-000000000001",
+                    "retryable": false,
+                    "action": "Top up your wallet or add an active allowance in your dashboard.",
+                    "billing_status": "not_charged"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "material_not_prepared: no ready native mapping supports this context."
+          }
+        },
+        "description": "Serve ready material only. Raw scripts are rejected before cache insertion or billing; no foreground learning or foreground preparation."
+      }
+    },
+    "/v1/usage": {
+      "get": {
+        "summary": "Read usage and limits without generation charge",
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "unauthorized",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "access_denied",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limited",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "generation_unavailable",
+            "headers": {
+              "X-Request-ID": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/materials/prepare": {
+      "post": {
+        "summary": "Prepare supplied material for subsequent generation",
+        "description": "Prepare custom material for its full supported input context before generation. Requires scripts or material_ref. A reference is usable only after state is ready. Incomplete preparations fail explicitly.",
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            },
+            "description": "Use the same key and identical input only when retrying this preparation operation."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplicitShapeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current preparation status; no generation credit is spent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Current preparation status; no generation credit is spent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/materials/preparations/{preparation_id}": {
+      "get": {
+        "summary": "Get or explicitly wait for material preparation status",
+        "description": "Authenticated and key-isolated. Client timeout or cancellation detaches only that waiter, leaving the shared operation active. Status reads never restart learning. Preparation/status spend no generation credits.",
+        "security": [
+          {
+            "ApiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "preparation_id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wait",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0
+            },
+            "description": "Optional bounded long poll until ready/terminal state, returning a snapshot at the wait deadline."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current preparation status; no generation credit is spent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Preparation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Standard actionable uncharged API error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "BrowserProfile": {
+        "additionalProperties": false,
+        "properties": {
+          "user_agent": {
+            "default": "Mozilla/5.0",
+            "maxLength": 8192,
+            "title": "User Agent",
+            "type": "string"
+          },
+          "platform": {
+            "default": "MacIntel",
+            "maxLength": 8192,
+            "title": "Platform",
+            "type": "string"
+          },
+          "language": {
+            "default": "en-US",
+            "maxLength": 8192,
+            "title": "Language",
+            "type": "string"
+          },
+          "languages": {
+            "default": [
+              "en-US",
+              "en"
+            ],
+            "items": {
+              "maxLength": 8192,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Languages",
+            "type": "array"
+          },
+          "screen": {
+            "$ref": "#/components/schemas/Screen"
+          },
+          "window": {
+            "$ref": "#/components/schemas/Window"
+          },
+          "webgl": {
+            "$ref": "#/components/schemas/WebGL"
+          },
+          "canvas": {
+            "$ref": "#/components/schemas/Canvas"
+          },
+          "navigator": {
+            "$ref": "#/components/schemas/Navigator"
+          }
+        },
+        "title": "BrowserProfile",
+        "type": "object"
+      },
+      "Canvas": {
+        "additionalProperties": false,
+        "properties": {
+          "data_url": {
+            "default": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=",
+            "title": "Data Url",
+            "type": "string",
+            "description": "Valid PNG data URL with bounded strict base64, CRC-checked chunks and image stream; each dimension at most 8192, at most 16 Mi pixels. Full effective profile stays within 64 KiB UTF-8."
+          }
+        },
+        "title": "Canvas",
+        "type": "object"
+      },
+      "Navigator": {
+        "additionalProperties": false,
+        "properties": {
+          "userAgent": {
+            "default": "Mozilla/5.0",
+            "maxLength": 8192,
+            "title": "Useragent",
+            "type": "string"
+          },
+          "platform": {
+            "default": "MacIntel",
+            "maxLength": 8192,
+            "title": "Platform",
+            "type": "string"
+          },
+          "vendor": {
+            "default": "Google Inc.",
+            "maxLength": 8192,
+            "title": "Vendor",
+            "type": "string"
+          },
+          "appVersion": {
+            "default": "5.0",
+            "maxLength": 8192,
+            "title": "Appversion",
+            "type": "string"
+          },
+          "appCodeName": {
+            "default": "Mozilla",
+            "maxLength": 8192,
+            "title": "Appcodename",
+            "type": "string"
+          },
+          "appName": {
+            "default": "Netscape",
+            "maxLength": 8192,
+            "title": "Appname",
+            "type": "string"
+          },
+          "product": {
+            "default": "Gecko",
+            "maxLength": 8192,
+            "title": "Product",
+            "type": "string"
+          },
+          "language": {
+            "default": "en-US",
+            "maxLength": 8192,
+            "title": "Language",
+            "type": "string"
+          },
+          "languages": {
+            "default": [
+              "en-US",
+              "en"
+            ],
+            "items": {
+              "maxLength": 8192,
+              "type": "string"
+            },
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Languages",
+            "type": "array"
+          },
+          "hardwareConcurrency": {
+            "default": 8,
+            "maximum": 1024,
+            "minimum": 1,
+            "title": "Hardwareconcurrency",
+            "type": "integer"
+          },
+          "maxTouchPoints": {
+            "default": 0,
+            "maximum": 100,
+            "minimum": 0,
+            "title": "Maxtouchpoints",
+            "type": "integer"
+          },
+          "webdriver": {
+            "default": false,
+            "title": "Webdriver",
+            "type": "boolean"
+          },
+          "cookieEnabled": {
+            "default": true,
+            "title": "Cookieenabled",
+            "type": "boolean"
+          },
+          "doNotTrack": {
+            "anyOf": [
+              {
+                "maxLength": 8192,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Donottrack"
+          }
+        },
+        "title": "Navigator",
+        "type": "object"
+      },
+      "RequestContext": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          }
+        },
+        "required": [
+          "url",
+          "method",
+          "content_type",
+          "body"
+        ],
+        "title": "RequestContext",
+        "type": "object"
+      },
+      "Screen": {
+        "additionalProperties": false,
+        "properties": {
+          "width": {
+            "default": 1920,
+            "maximum": 32768,
+            "minimum": 1,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1080,
+            "maximum": 32768,
+            "minimum": 1,
+            "title": "Height",
+            "type": "integer"
+          },
+          "availWidth": {
+            "default": 1920,
+            "maximum": 32768,
+            "minimum": 0,
+            "title": "Availwidth",
+            "type": "integer"
+          },
+          "availHeight": {
+            "default": 1040,
+            "maximum": 32768,
+            "minimum": 0,
+            "title": "Availheight",
+            "type": "integer"
+          },
+          "colorDepth": {
+            "default": 24,
+            "maximum": 64,
+            "minimum": 1,
+            "title": "Colordepth",
+            "type": "integer"
+          },
+          "pixelDepth": {
+            "default": 24,
+            "maximum": 64,
+            "minimum": 1,
+            "title": "Pixeldepth",
+            "type": "integer"
+          }
+        },
+        "title": "Screen",
+        "type": "object"
+      },
+      "Script": {
+        "additionalProperties": false,
+        "properties": {
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "source"
+        ],
+        "title": "Script",
+        "type": "object"
+      },
+      "WebGL": {
+        "additionalProperties": false,
+        "properties": {
+          "renderer": {
+            "default": "Sandbox Renderer",
+            "maxLength": 8192,
+            "title": "Renderer",
+            "type": "string"
+          },
+          "vendor": {
+            "default": "Google Inc.",
+            "maxLength": 8192,
+            "title": "Vendor",
+            "type": "string"
+          }
+        },
+        "title": "WebGL",
+        "type": "object"
+      },
+      "Window": {
+        "additionalProperties": false,
+        "properties": {
+          "innerWidth": {
+            "default": 1920,
+            "maximum": 32768,
+            "minimum": 1,
+            "title": "Innerwidth",
+            "type": "integer"
+          },
+          "innerHeight": {
+            "default": 1040,
+            "maximum": 32768,
+            "minimum": 1,
+            "title": "Innerheight",
+            "type": "integer"
+          },
+          "outerWidth": {
+            "default": 1920,
+            "maximum": 32768,
+            "minimum": 1,
+            "title": "Outerwidth",
+            "type": "integer"
+          },
+          "outerHeight": {
+            "default": 1080,
+            "maximum": 32768,
+            "minimum": 1,
+            "title": "Outerheight",
+            "type": "integer"
+          },
+          "devicePixelRatio": {
+            "default": 1.0,
+            "maximum": 16,
+            "minimum": 0.1,
+            "title": "Devicepixelratio",
+            "type": "number"
+          },
+          "screenX": {
+            "default": 0,
+            "title": "Screenx",
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "screenY": {
+            "default": 0,
+            "title": "Screeny",
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "screenLeft": {
+            "default": 0,
+            "title": "Screenleft",
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "screenTop": {
+            "default": 0,
+            "title": "Screentop",
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "pageXOffset": {
+            "default": 0,
+            "title": "Pagexoffset",
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "pageYOffset": {
+            "default": 0,
+            "title": "Pageyoffset",
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          }
+        },
+        "title": "Window",
+        "type": "object"
+      },
+      "ShapeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "source_url": {
+            "title": "Source Url",
+            "type": "string",
+            "description": "Required source-page URL. Managed selection uses a registered HTTPS source on port 443. Explicit references must match their original source URL."
+          },
+          "material_ref": {
+            "maxLength": 128,
+            "minLength": 16,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string",
+            "description": "Private source reference with current native readiness for this supported context. A queued source reference alone does not establish readiness."
+          },
+          "profile": {
+            "$ref": "#/components/schemas/BrowserProfile"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RequestContext"
+          },
+          "document_cookie": {
+            "default": "",
+            "title": "Document Cookie",
+            "type": "string",
+            "description": "JavaScript-visible cookies only, at most 16 KiB; never retained in material cache."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "header",
+              "form"
+            ],
+            "default": "header",
+            "description": "Header mode (the default) returns HTTP telemetry headers. Form mode runs form instrumentation and returns body fields."
+          },
+          "form": {
+            "$ref": "#/components/schemas/FormContext",
+            "description": "Form mode only. Optional observed form ID and name; omitting this object creates the selected form without either attribute."
+          }
+        },
+        "required": [
+          "source_url",
+          "profile",
+          "request"
+        ],
+        "title": "ShapeRequest",
+        "type": "object",
+        "oneOf": [
+          {
+            "required": [
+              "material_ref"
+            ]
+          },
+          {
+            "not": {
+              "required": [
+                "material_ref"
+              ]
+            },
+            "properties": {
+              "mode": {
+                "const": "header"
+              },
+              "source_url": {
+                "pattern": "^https://"
+              }
+            }
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "form"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "properties": {
+                "request": {
+                  "properties": {
+                    "method": {
+                      "const": "POST"
+                    },
+                    "content_type": {
+                      "type": "string",
+                      "description": "application/x-www-form-urlencoded, optionally with one UTF-8 charset parameter.",
+                      "pattern": "^[aA][pP][pP][lL][iI][cC][aA][tT][iI][oO][nN]/[xX]-[wW][wW][wW]-[fF][oO][rR][mM]-[uU][rR][lL][eE][nN][cC][oO][dD][eE][dD](?:\\s*;\\s*[cC][hH][aA][rR][sS][eE][tT]\\s*=\\s*(?:\"[uU][tT][fF]-?8\"|[uU][tT][fF]-?8))?\\s*$"
+                    },
+                    "body": {
+                      "type": "string",
+                      "description": "Exact encoded application body before telemetry insertion; an empty string is permitted. At most 256 KiB UTF-8, 1,024 decoded pairs and 256 UTF-8 bytes per field name. Preserve duplicate fields, order and empty values. Malformed percent escapes, invalid UTF-8, NUL and a complete stale telemetry family are rejected."
+                    }
+                  }
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "form"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Generation with a ready private reference or ready managed header material. Raw scripts are accepted by preparation only."
+      },
+      "ShapeResponse": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/HeaderShapeResponse"
+          },
+          {
+            "$ref": "#/components/schemas/FormShapeResponse"
+          }
+        ],
+        "description": "Transport-specific output: header and form properties are mutually exclusive. Metadata meanings are unchanged. Generation does not establish target acceptance."
+      },
+      "UsageResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "request_id",
+          "limits",
+          "allowance"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "daily_used": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Legacy admitted-attempt analytics only; no daily or monthly cap is enforced.",
+            "deprecated": true
+          },
+          "monthly_used": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Legacy admitted-attempt analytics only; no daily or monthly cap is enforced.",
+            "deprecated": true
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "requests_per_second"
+            ],
+            "properties": {
+              "requests_per_second": {
+                "type": "number",
+                "maximum": 10000,
+                "exclusiveMinimum": 0,
+                "description": "Effective account-wide RPS across all keys: trial ceiling 15, general default 500, enterprise default 5000 with administrator overrides up to 10000. Lower account limits and service capacity still apply. Verified paid purchases remove trial-only caps while complimentary calls remain."
+              }
+            }
+          },
+          "allowance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "weekly_limit",
+              "weekly_used",
+              "weekly_remaining",
+              "weekly_resets_at",
+              "prepaid_remaining",
+              "wallet",
+              "payg_rate_per_1000_usd"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "owner",
+                  "custom",
+                  "subscription",
+                  "prepaid",
+                  "wallet"
+                ]
+              },
+              "weekly_limit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "weekly_used": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Spent and currently reserved calls in the current allowance period."
+              },
+              "weekly_remaining": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "weekly_resets_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "prepaid_remaining": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Deprecated standard-rate call equivalent of available wallet funds ($5 per 1,000); use wallet.balance_usd and the current PAYG rate. Deferred legacy conversions may still expose their original call count.",
+                "deprecated": true
+              },
+              "wallet": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "balance_usd",
+                  "balance_micro_usd"
+                ],
+                "properties": {
+                  "balance_usd": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Available preloaded USD wallet funds."
+                  },
+                  "balance_micro_usd": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "Exact available balance in millionths of one USD."
+                  }
+                }
+              },
+              "payg_rate_per_1000_usd": {
+                "type": "number",
+                "enum": [
+                  5,
+                  3.5,
+                  2.5,
+                  2,
+                  1.5
+                ],
+                "description": "Standard PAYG or the newest eligible paid period rate per 1,000 successful generations, after weekly allowance."
+              },
+              "legacy_prepaid_deprecated": {
+                "type": "boolean",
+                "const": true,
+                "description": "Legacy prepaid-call fields are deprecated; display authoritative wallet funds."
+              },
+              "bonus_remaining": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Available unrevoked complimentary calls; separate from paid weekly calls and wallet funds."
+              },
+              "trial_remaining": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Available unrevoked complimentary calls; separate from paid weekly calls and wallet funds."
+              },
+              "complimentary_remaining": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Available unrevoked complimentary calls; separate from paid weekly calls and wallet funds."
+              },
+              "trial_ends_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time",
+                "description": "Deprecated compatibility field; null for current complimentary credits. Does not alter account access expiry or create renewal charges.",
+                "deprecated": true
+              },
+              "trial": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "kind",
+                  "calls",
+                  "remaining",
+                  "starts_at",
+                  "expires_at",
+                  "revoked_at",
+                  "rps",
+                  "concurrency"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "trial"
+                  },
+                  "calls": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "remaining": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "starts_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "expires_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time",
+                    "description": "Null for current complimentary credits; historical timestamps are retained for compatibility."
+                  },
+                  "revoked_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "rps": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "exclusiveMinimum": 0,
+                    "maximum": 15
+                  },
+                  "concurrency": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1,
+                    "maximum": 128
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message",
+              "request_id"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string",
+                "description": "Safe explanation without internal exception details."
+              },
+              "request_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "retryable": {
+                "type": "boolean",
+                "description": "Optional temporary-error guidance. SDKs never retry generation automatically. Check request history after an uncertain outcome."
+              },
+              "reason": {
+                "type": "string",
+                "description": "Specific cause, such as account_disabled, account_expired, policies_required, domain_not_approved or domain_pending. Existing error codes are preserved."
+              },
+              "action": {
+                "type": "string",
+                "description": "Safe next step for the caller."
+              },
+              "domain": {
+                "type": "string",
+                "description": "Rejected hostname. A root domain and its www alias share approval; other subdomains require explicit approval."
+              },
+              "field": {
+                "type": "string",
+                "description": "Request field involved, such as source_url or request.url."
+              },
+              "billing_status": {
+                "type": "string",
+                "enum": [
+                  "not_charged",
+                  "pending",
+                  "unknown"
+                ],
+                "description": "not_charged: no allowance or wallet funds were used. pending: the billing record is still updating. unknown or absent: billing could not be confirmed. Check history before resubmitting."
+              }
+            }
+          }
+        }
+      },
+      "FormContext": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "Optional observed form id; control characters are forbidden."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 256,
+            "description": "Optional observed form name; control characters are forbidden."
+          }
+        }
+      },
+      "HeaderShapeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "headers",
+          "request_id",
+          "generation_ms",
+          "profile_used",
+          "material_ref",
+          "material_expires_at"
+        ],
+        "properties": {
+          "headers": {
+            "type": "object",
+            "minProperties": 6,
+            "maxProperties": 7,
+            "propertyNames": {
+              "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}-(?:[aA]0|[aAbBcCdDfFzZ])$"
+            },
+            "patternProperties": {
+              "^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}-(?:[aA]0|[aAbBcCdDfFzZ])$": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "description": "Complete customer-specific same-prefix a/b/c/d/f/z family with one optional same-family a0 header when the selected material emits it during this generation. All six core suffixes are required; suffixes and prefixes compare case-insensitively, with no duplicate suffixes. Original header names, values and case are preserved. Header names use ASCII HTTP token characters and need no X- prefix. Values contain only ASCII bytes 0x21 through 0x7e with no whitespace; d may be empty, and a0 must be nonempty. Other numbered suffixes are not accepted. Generation does not assert target acceptance."
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "profile_used": {
+            "$ref": "#/components/schemas/BrowserProfile",
+            "description": "Effective supported browser identity; canvas pixels and document cookies are excluded."
+          },
+          "material_ref": {
+            "type": "string"
+          },
+          "material_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Five-minute immutable material expiry, UTC. References are scoped to this API key."
+          },
+          "path": {
+            "type": "string",
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "material_reuse": {
+            "type": "boolean",
+            "description": "Whether the resolved source material was reused."
+          },
+          "discovery_duration_ms": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 3600000,
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "discovery_state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "fallback_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "fallback_message": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          }
+        },
+        "title": "HeaderShapeResponse"
+      },
+      "FormShapeResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "form_fields",
+          "form_body",
+          "request_id",
+          "generation_ms",
+          "profile_used",
+          "material_ref",
+          "material_expires_at"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "generation_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "profile_used": {
+            "$ref": "#/components/schemas/BrowserProfile",
+            "description": "Effective supported browser identity; canvas pixels and document cookies are excluded."
+          },
+          "material_ref": {
+            "type": "string"
+          },
+          "material_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Five-minute immutable material expiry, UTC. References are scoped to this API key."
+          },
+          "form_fields": {
+            "type": "object",
+            "minProperties": 6,
+            "maxProperties": 6,
+            "additionalProperties": false,
+            "patternProperties": {
+              "^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}[abcdfz]$": {
+                "type": "string",
+                "maxLength": 16384
+              }
+            },
+            "description": "Six exact-case names sharing one common base and suffixes a/b/c/d/f/z, in captured insertion order. No separator is assumed. Values are opaque UTF-8 strings of at most 16 KiB each, without C0 control characters or DEL; d may be empty. One complete family is required."
+          },
+          "form_body": {
+            "type": "string",
+            "description": "Telemetry only, encoded once with native URLSearchParams in form_fields order. Contains no application fields. Preserve this raw string when prepending it to request.body. Must exactly serialize form_fields; at most 256 KiB UTF-8."
+          },
+          "path": {
+            "type": "string",
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "material_reuse": {
+            "type": "boolean",
+            "description": "Whether the resolved source material was reused."
+          },
+          "discovery_duration_ms": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 3600000,
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "discovery_state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "fallback_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "fallback_message": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          }
+        },
+        "title": "FormShapeResponse"
+      },
+      "Preparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "preparation_id",
+          "state",
+          "status_url",
+          "retry_after_ms",
+          "preparation_expires_at",
+          "material_ref",
+          "material_expires_at",
+          "ready_until",
+          "execution_backend",
+          "error"
+        ],
+        "properties": {
+          "preparation_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "learning",
+              "validating",
+              "publishing",
+              "ready",
+              "failed",
+              "expired"
+            ]
+          },
+          "status_url": {
+            "type": "string",
+            "pattern": "^/v1/materials/preparations/[a-f0-9]{32}$"
+          },
+          "retry_after_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 60000
+          },
+          "preparation_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "material_ref": {
+            "type": "string",
+            "description": "Existing key-scoped source reference; alone it does not establish readiness."
+          },
+          "material_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ready_until": {
+            "oneOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "execution_backend": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Legacy diagnostic metadata, retained for compatibility. Use preparation state to determine readiness.",
+            "deprecated": true
+          },
+          "error": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "code"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[a-z_]{1,64}$"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "action": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "description": "Optional asynchronous preparation of explicit material. Ready means usable validated output and acknowledged publication for the supplied context. Defaulted internal records are accepted when outputs remain valid. Lost eligibility invalidates readiness. Waiting never starts generation or spends generation credits."
+      },
+      "ExplicitShapeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "source_url": {
+            "title": "Source Url",
+            "type": "string",
+            "description": "Required source-page URL. Managed selection uses a registered HTTPS source on port 443. Explicit references must match their original source URL."
+          },
+          "scripts": {
+            "items": {
+              "$ref": "#/components/schemas/Script"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array",
+            "description": "Preparation input: complete ordered JavaScript, 1–16 scripts, 2 MiB each / 3 MiB total. Supply scripts or material_ref, never both. Omit both for managed header generation."
+          },
+          "material_ref": {
+            "maxLength": 128,
+            "minLength": 16,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "type": "string",
+            "description": "Optional private API-key-scoped source reference. Do not pin this field in managed flows; leave both material fields omitted to select updates."
+          },
+          "profile": {
+            "$ref": "#/components/schemas/BrowserProfile"
+          },
+          "request": {
+            "$ref": "#/components/schemas/RequestContext"
+          },
+          "document_cookie": {
+            "default": "",
+            "title": "Document Cookie",
+            "type": "string",
+            "description": "JavaScript-visible cookies only, at most 16 KiB; never retained in material cache."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "header",
+              "form"
+            ],
+            "default": "header",
+            "description": "Header mode (the default) returns HTTP telemetry headers. Form mode runs form instrumentation and returns body fields."
+          },
+          "form": {
+            "$ref": "#/components/schemas/FormContext",
+            "description": "Form mode only. Optional observed form ID and name; omitting this object creates the selected form without either attribute."
+          }
+        },
+        "required": [
+          "source_url",
+          "profile",
+          "request"
+        ],
+        "title": "ExplicitShapeRequest",
+        "type": "object",
+        "oneOf": [
+          {
+            "required": [
+              "scripts"
+            ],
+            "not": {
+              "required": [
+                "material_ref"
+              ]
+            }
+          },
+          {
+            "required": [
+              "material_ref"
+            ],
+            "not": {
+              "required": [
+                "scripts"
+              ]
+            }
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "form"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "properties": {
+                "request": {
+                  "properties": {
+                    "method": {
+                      "const": "POST"
+                    },
+                    "content_type": {
+                      "type": "string",
+                      "description": "application/x-www-form-urlencoded, optionally with one UTF-8 charset parameter.",
+                      "pattern": "^[aA][pP][pP][lL][iI][cC][aA][tT][iI][oO][nN]/[xX]-[wW][wW][wW]-[fF][oO][rR][mM]-[uU][rR][lL][eE][nN][cC][oO][dD][eE][dD](?:\\s*;\\s*[cC][hH][aA][rR][sS][eE][tT]\\s*=\\s*(?:\"[uU][tT][fF]-?8\"|[uU][tT][fF]-?8))?\\s*$"
+                    },
+                    "body": {
+                      "type": "string",
+                      "description": "Exact encoded application body before telemetry insertion; an empty string is permitted. At most 256 KiB UTF-8, 1,024 decoded pairs and 256 UTF-8 bytes per field name. Preserve duplicate fields, order and empty values. Malformed percent escapes, invalid UTF-8, NUL and a complete stale telemetry family are rejected."
+                    }
+                  }
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "form"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Custom sources or an existing source reference and the context to prepare. Wait for explicit ready state."
+      }
+    }
+  }
+}

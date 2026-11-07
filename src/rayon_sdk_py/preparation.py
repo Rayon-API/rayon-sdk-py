@@ -9,7 +9,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from .errors import RayonError, HTTPError, TransportError, InvalidResponseError, ValidationError
-from .models import ShapeRequest, FormShapeRequest
+from .models import PreparationRequest, FormPreparationRequest
 from .validation import validate_shape, response_metadata
 
 _FIELDS = frozenset(('preparation_id', 'state', 'status_url', 'retry_after_ms', 'preparation_expires_at',
@@ -142,7 +142,7 @@ def _result(value):
     return None
 
 class SyncPreparation:
-    def prepare(self, shape: ShapeRequest | FormShapeRequest) -> Preparation:
+    def prepare(self, shape: PreparationRequest | FormPreparationRequest) -> Preparation:
         body = validate_shape(shape, require_material=True)
         value, metadata = self._send('POST', '/v1/materials/prepare', body,
             headers={'Idempotency-Key': uuid.uuid4().hex}, preparation=True)
@@ -183,13 +183,13 @@ class SyncPreparation:
                 raise
             time.sleep(min(delay, max(0, deadline - time.monotonic())))
 
-    def prepare_and_wait(self, shape: ShapeRequest | FormShapeRequest, *, wait_timeout: float = 60) -> ReadyMaterial:
+    def prepare_and_wait(self, shape: PreparationRequest | FormPreparationRequest, *, wait_timeout: float = 60) -> ReadyMaterial:
         _budget(wait_timeout)
         value = self.prepare(shape)
         return _result(value) or self.wait_until_ready(value.preparation_id, wait_timeout=wait_timeout)
 
 class AsyncPreparation:
-    async def prepare(self, shape: ShapeRequest | FormShapeRequest) -> Preparation:
+    async def prepare(self, shape: PreparationRequest | FormPreparationRequest) -> Preparation:
         body = validate_shape(shape, require_material=True)
         value, metadata = await self._send('POST', '/v1/materials/prepare', body,
             headers={'Idempotency-Key': uuid.uuid4().hex}, preparation=True)
@@ -233,7 +233,7 @@ class AsyncPreparation:
         except asyncio.CancelledError:
             raise PreparationCancelledError(ident) from None
 
-    async def prepare_and_wait(self, shape: ShapeRequest | FormShapeRequest, *, wait_timeout: float = 60) -> ReadyMaterial:
+    async def prepare_and_wait(self, shape: PreparationRequest | FormPreparationRequest, *, wait_timeout: float = 60) -> ReadyMaterial:
         _budget(wait_timeout)
         value = await self.prepare(shape)
         return _result(value) or await self.wait_until_ready(value.preparation_id, wait_timeout=wait_timeout)

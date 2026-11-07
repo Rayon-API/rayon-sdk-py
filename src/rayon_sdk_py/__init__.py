@@ -3,6 +3,7 @@
 from .client import Client, AsyncClient, generate
 from .validation import validate_profile
 from .models import (
+    PreparationRequest, FormPreparationRequest,
     ShapeRequest,
     BrowserProfile,
     ShapeResult,
@@ -22,13 +23,14 @@ from .errors import (
     InvalidResponseError,
 )
 
-__version__ = "2.1.0"
+__version__ = "3.0.0rc1"
 __all__ = [
     "Preparation", "ReadyMaterial", "PreparationError", "PreparationCancelledError",
     "Client",
     "AsyncClient",
     "generate",
     "validate_profile",
+    "PreparationRequest", "FormPreparationRequest",
     "ShapeRequest",
     "BrowserProfile",
     "ShapeResult",

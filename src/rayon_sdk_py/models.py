@@ -87,9 +87,8 @@ class FormMetadata(TypedDict, total=False):
 
 
 class ShapeRequest(_ShapeRequired, total=False):
-    """Omit material for managed header generation, or supply one explicit input."""
+    """Omit material for managed header generation, or supply a ready reference."""
 
-    scripts: list[ScriptMaterial]
     material_ref: str
     document_cookie: str
     mode: Literal["header"]
@@ -97,11 +96,26 @@ class ShapeRequest(_ShapeRequired, total=False):
 
 class _FormRequired(_ShapeRequired):
     mode: Literal["form"]
+    material_ref: str
 
 
 class FormShapeRequest(_FormRequired, total=False):
-    """Application form before telemetry insertion; exactly one material input."""
+    """Application form before telemetry insertion; requires a ready reference."""
 
+    document_cookie: str
+    form: FormMetadata
+
+
+class PreparationRequest(ShapeRequest, total=False):
+    """Explicit sources or an existing reference, with the context to prepare."""
+    scripts: list[ScriptMaterial]
+
+
+class _FormPreparationRequired(_ShapeRequired):
+    mode: Literal["form"]
+
+
+class FormPreparationRequest(_FormPreparationRequired, total=False):
     scripts: list[ScriptMaterial]
     material_ref: str
     document_cookie: str

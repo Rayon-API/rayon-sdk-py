@@ -33,7 +33,7 @@ with OpenID Connect. No stored PyPI token is required.
 PyPI versions cannot be overwritten. If a released package needs correction,
 increment the version and publish a new release.
 
-Verify the current API instructions, sync/async lifecycle, strict input limits, exact body preservation, error envelopes, expiry-scoped references, no retries of ambiguous POST outcomes and exactly one confirmed unbilled material-miss recovery in SDK 1.1.4+, and packed public type exports. Never rewrite published packages or their release tags. Do not include customer scripts, captured material, credentials, or private fixtures in distributions.
+Verify the current API instructions, sync/async lifecycle, strict input limits, exact body preservation, error envelopes, expiry-scoped references, no retries of ambiguous POST outcomes and no automatic generation retry, and packed public type exports. Never rewrite published packages or their release tags. Do not include customer scripts, captured material, credentials, or private fixtures in distributions.
 
 Version 1.0.2 rejects server-issued material references that cannot be reused as valid requests. Verify the short, oversized, and invalid-character response reference regressions before release.
 
@@ -47,9 +47,19 @@ incomplete-family rejection, and exactly six form fields with a larger `a` value
 
 ## Managed-material release gate
 
-Candidate: 2.1.0. Verify managed header generation, explicit uploads/references,
+Candidate: 3.0.0-rc.1. Verify managed header generation, required custom preparation and ready references,
 materialless-preparation rejection, safe fallback metadata and all existing
 preparation/cancellation tests. Check package contents and a clean consumer.
 Publish only after the maintainer approves the API contract and release report.
-Keep Go's `/v2` import path. Publish core JS before the Playwright adapter, then
+Keep Go's `/v3` import path. Publish core JS before the Playwright adapter, then
 examples and docs. Local builds do not publish packages or deploy services.
+
+## Preparation-required release candidate
+
+This branch is not published or deployed. Generation rejects raw sources and
+never uploads sources, starts learning or retries on expiry. Custom material
+must reach ready before its reference is used. Make compatible preparation available, distribute reviewed SDKs, migrate clients,
+then enforce the new solve contract. Publish core SDK major 3 before Playwright major 2.
+Keep all account/context/readiness and billing checks. Do not move published tags.
+Refresh the Playwright registry lock entry after core JS is published; the new
+core version cannot resolve from npm before that publication.

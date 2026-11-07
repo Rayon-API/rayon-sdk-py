@@ -181,7 +181,7 @@
       "material_expired"
     ],
     "message": "The material reference has expired.",
-    "action": "Upload the scripts again to obtain a fresh reference.",
+    "action": "Check readiness and expiry. Refresh custom material through preparation; managed material is refreshed by the service.",
     "retryable": false
   },
   "material_context_mismatch": {
@@ -205,7 +205,7 @@
       "material_cache_unavailable"
     ],
     "message": "Automatic material is warming or unavailable.",
-    "action": "Wait a moment, then retry. Contact support if this continues.",
+    "action": "Check readiness and expiry. Refresh custom material through preparation; managed material is refreshed by the service.",
     "retryable": true,
     "retry_after": 1
   },
@@ -365,8 +365,8 @@
     "codes": [
       "daily_quota_exceeded"
     ],
-    "message": "A legacy daily request cap rejected this request.",
-    "action": "Contact support with the request ID. This cap is separate from your weekly allowance and wallet balance.",
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
     "retryable": false
   },
   "durable_redis_required": {
@@ -509,8 +509,8 @@
     "codes": [
       "monthly_quota_exceeded"
     ],
-    "message": "A legacy monthly request cap rejected this request.",
-    "action": "Contact support with the request ID. This cap is separate from your weekly allowance and wallet balance.",
+    "message": "The request could not be completed.",
+    "action": "Contact support with the request ID. Check request history before sending another request.",
     "retryable": false
   },
   "native_build_mismatch": {
@@ -553,36 +553,44 @@
     "action": "Contact support with the request ID. Check request history before sending another request.",
     "retryable": false
   },
+  "material_preparation_required": {
+    "codes": [
+      "material_preparation_required"
+    ],
+    "message": "Custom script sources must be prepared before generation.",
+    "action": "Submit sources to the preparation endpoint, wait for ready, then use the ready material reference.",
+    "retryable": false
+  },
   "material_not_prepared": {
     "codes": [
       "material_not_prepared"
     ],
-    "message": "This material is not ready for Rust generation.",
-    "action": "Prepare the material and wait for ready before generating.",
-    "retryable": false
-  },
-  "material_learning": {
-    "codes": [
-      "material_learning"
-    ],
-    "message": "This material is being prepared.",
-    "action": "Wait for the preparation operation to become ready.",
+    "message": "No ready material supports this request context.",
+    "action": "Check preparation readiness, supported input scope and expiry. Prepare custom material again or contact support for managed material.",
     "retryable": false
   },
   "prepared_material_expired": {
     "codes": [
       "prepared_material_expired"
     ],
-    "message": "The prepared material is no longer ready.",
-    "action": "Prepare the current material again before generating.",
+    "message": "Material readiness has expired.",
+    "action": "Prepare current custom material again or contact support for managed material.",
+    "retryable": false
+  },
+  "material_learning": {
+    "codes": [
+      "material_learning"
+    ],
+    "message": "Material preparation is still pending.",
+    "action": "Wait for ready state using the existing preparation ID.",
     "retryable": false
   },
   "idempotency_conflict": {
     "codes": [
       "idempotency_conflict"
     ],
-    "message": "This idempotency key was used for different preparation input.",
-    "action": "Use the original input or a new idempotency key.",
+    "message": "The idempotency key was reused with different input.",
+    "action": "Reuse the same key only with the same request; use a new key for a new preparation.",
     "retryable": false
   },
   "preparation_unavailable": {
@@ -590,15 +598,15 @@
       "preparation_unavailable"
     ],
     "message": "Material preparation is temporarily unavailable.",
-    "action": "Check preparation status or try preparation again shortly.",
-    "retryable": false
+    "action": "Resume status checks for an existing job; do not repeat an uncertain preparation request.",
+    "retryable": true
   },
   "preparation_failed": {
     "codes": [
       "preparation_failed"
     ],
-    "message": "Material preparation did not succeed.",
-    "action": "Check the supported material and context before preparing again.",
+    "message": "The supplied material could not be prepared.",
+    "action": "Check complete ordered sources and the requested input context, or contact support.",
     "retryable": false
   },
   "preparation_expired": {
@@ -606,23 +614,23 @@
       "preparation_expired"
     ],
     "message": "The preparation has expired.",
-    "action": "Prepare current material again.",
+    "action": "Start a new preparation with current sources and inputs.",
     "retryable": false
   },
   "preparation_unauthorized": {
     "codes": [
       "preparation_unauthorized"
     ],
-    "message": "Access to this preparation is no longer authorized.",
-    "action": "Check API key and domain access.",
+    "message": "This preparation is no longer authorized.",
+    "action": "Check account access, API key and approved input domains.",
     "retryable": false
   },
   "preparation_timeout": {
     "codes": [
       "preparation_timeout"
     ],
-    "message": "Material preparation exceeded its deadline.",
-    "action": "Check preparation status before starting another operation.",
+    "message": "Material preparation exceeded its time budget.",
+    "action": "Retain the preparation ID and contact support before starting another job.",
     "retryable": false
   },
   "preparation_interrupted": {
@@ -630,7 +638,7 @@
       "preparation_interrupted"
     ],
     "message": "Material preparation was interrupted.",
-    "action": "Check preparation status and prepare again if needed.",
+    "action": "Check the existing job status and prepare again only after a terminal failure.",
     "retryable": false
   }
 }

@@ -3,7 +3,7 @@ import json
 import time
 import pytest
 import rayon_sdk_py as sdk
-from test_sdk import KEY, shape, transport
+from test_sdk import KEY, explicit_shape as shape, transport
 
 ID = "prep_0123456789abcdef"
 def frame(state="ready", **changes):

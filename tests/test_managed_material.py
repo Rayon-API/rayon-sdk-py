@@ -6,7 +6,7 @@ from test_sdk import transport, shape, result, KEY
 
 def managed():
     value = shape()
-    del value["scripts"]
+    del value["material_ref"]
     return value
 
 def test_automatic_omission_survives_explicit_cache_and_rotation(transport):
@@ -20,7 +20,7 @@ def test_automatic_omission_survives_explicit_cache_and_rotation(transport):
         assert "scripts" not in body and "material_ref" not in body
 
 def test_async_automatic_and_metadata(transport):
-    metadata = dict(path="isolated", material_reuse=False, discovery_duration_ms=12.5, discovery_state="failed", fallback_reason="unknown_material", fallback_message="A fallback was used. Contact support with this request ID.")
+    metadata = dict(path="native", material_reuse=True, discovery_duration_ms=12.5, discovery_state="complete", fallback_reason=None)
     transport["body"] = result(**metadata)
     async def run():
         async with sdk.AsyncClient(KEY) as client:

@@ -15,10 +15,13 @@ the target request.
 
 ## Install
 
+This is an unpublished release candidate for the preparation-required server contract.
+Deploy the compatible server before migrating clients.
+
 Requires Python 3.10+.
 
 ```sh
-python -m pip install 'rayon-sdk-py>=2.1.0,<3'
+python -m pip install 'rayon-sdk-py>=3.0.0rc1,<4'
 ```
 
 ## Generate
@@ -39,8 +42,6 @@ shape = {
 }
 with Client(os.environ["RAYON_API_KEY"]) as client:
     result = client.generate(shape)
-    if result.fallback_reason:
-        print("A fallback was used. Contact support with request ID:", result.request_id)
     # Apply result.headers with your target client. Keep client open for further calls.
 ```
 
@@ -52,48 +53,32 @@ request. Keep application headers and session state in your target client.
 Generate fresh telemetry for each request and inspect the target response to
 check acceptance. Rayon returns no target cookies.
 
-## Fallback reporting
+## Material and readiness
 
-When `fallback_reason` is present and non-null, a fallback was used. Contact
-support with `request_id` about the mapping issue. `fallback_message` provides
-safe guidance when available. Do not infer fallback from timing alone.
+Generation accepts ready managed material or a ready private reference. Custom
+scripts must go through preparation. Unsupported, expired or unprepared inputs
+return an explicit error. Generation does not prepare material or retry automatically.
 
-Results also expose optional `path`, `material_reuse`, `discovery_state` and
-`discovery_duration_ms`. Older responses can omit these fields.
-
-## Optional material and preparation
-
-For an explicit override, supply either `scripts` (complete ordered sources) or
-`material_ref` (a private reference), never both. Omit the unused field; null and
-empty values are invalid. Customer uploads and references remain private to the
-API key. Automatic requests should keep both fields omitted on every call so
-new public material can be selected.
-
-Form mode still requires explicit material. Set `mode: "form"`, supply the exact
-URL-encoded POST application body before telemetry insertion, and prepend the
-returned `form_body` once. It contains telemetry only. Preserve duplicate fields
-and encoding. See [form integration](https://docs.rayonapi.com/form-payload-integration).
-
-Preparation is optional for explicit material. It checks the supplied context
-before a workload; it is separate from managed selection and generation.
-Usable validated mappings can be ready without every internal record being mapped.
-Generated headers and form fields must still pass output validation.
+## Custom material requires preparation
 
 ```python
-# explicit_shape includes scripts or material_ref and the current full context.
 ready = client.prepare_and_wait(explicit_shape, wait_timeout=60)
-current = {k: v for k, v in explicit_shape.items() if k not in ("scripts", "material_ref")}
-result = client.generate({**current, "material_ref": ready.material_ref})
+context = {k: v for k, v in explicit_shape.items() if k not in ("scripts", "material_ref")}
+result = client.generate({**context, "material_ref": ready.material_ref})
 ```
 
-Sync and async clients retain `prepare`, `get_preparation`, `wait_until_ready`
-and `prepare_and_wait`. Waits default to 60 seconds; status long polls accept
-0–10 seconds. `Preparation` exposes states and `ReadyMaterial` confirms readiness.
-Timeout/cancellation leaves the server job running. `PreparationError` retains
-`preparation_id` and a `kind` of `timeout`, `failed`, `expired` or `aborted`.
-Async cancellation raises `PreparationCancelledError`, retaining the resumable ID.
-Readiness expires separately from the source reference; prepare current explicit
-context again after expiry or relevant input changes.
+Submit complete sources and the intended context with the preparation helper. Wait for
+`state: ready`, then use its `material_ref` for generation.
+A queued job can already contain a reference; that does not establish readiness.
+Readiness is scoped to supported inputs. Normal request inputs may vary only within
+that documented scope; an unchanged program does not establish universal coverage.
+
+Refresh custom material outside generation before the earlier of `ready_until` and
+`material_expires_at`, or after a supported deployment change. Wait for the replacement
+to become ready before switching references. Keep original sources on your side for
+refresh. Expired references are never recovered by uploading scripts to a solve call.
+For managed header calls, keep both material fields omitted on every request.
+Form mode requires an explicit ready reference.
 
 ## Client options and errors
 
@@ -105,13 +90,9 @@ Errors inherit `RayonError`: `ValidationError`, `TransportError`, `HTTPError`
 and `InvalidResponseError`. Metadata includes `status_code`, `request_id`,
 `code`, `retry_after`, `reason`, `action`, `domain`, `field`, `billing_status`
 and `retryable` when available. Check request history before retrying a timeout
-or uncertain billing outcome. Only a definite uncharged `material_expired`
-receives one recovery attempt, while original explicit sources remain retained.
-No other generation error is automatically retried.
+or uncertain billing outcome. Generation is never automatically retried. Refresh expired custom material through preparation before resubmitting a solve.
 
-Explicit-source caching retains up to 128 bundles / 16 MiB per client, coalesces
-uploads and refreshes near expiry. References last up to five minutes and may
-expire earlier. Automatic generation never pins a returned reference. The SDK
+The client retains no solve-upload source cache. Automatic generation never pins a returned reference. The SDK
 does not fetch target scripts, send target requests or cache generated telemetry.
 
 [Errors](https://docs.rayonapi.com/errors) · [Release instructions](RELEASE.md) ·
