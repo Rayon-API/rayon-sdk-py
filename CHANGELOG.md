@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.0-rc.2
+
+- Allow preparation waits up to 30 minutes by default; explicit timeouts and cancellation remain supported.
+- Keep per-request deadlines bounded and retain job IDs for resuming a wait.
+
 ## Preparation-required release candidate
 
 - Generation accepts ready managed material or a ready private reference; raw sources belong to preparation.

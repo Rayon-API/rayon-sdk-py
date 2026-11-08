@@ -192,3 +192,32 @@ def test_async_cancellation_during_poll_preserves_typed_resume_error(transport, 
             assert len(calls) == 1 and calls[0][0] == 'GET'
             assert KEY not in repr(caught.value)
     asyncio.run(run())
+
+@pytest.mark.parametrize('asynchronous', [False, True])
+def test_default_prepare_wait_can_finish_after_one_minute(transport, monkeypatch, asynchronous):
+    from types import SimpleNamespace
+    import rayon_sdk_py.preparation as preparation
+    clock = [0.0]
+    calls = []
+    monkeypatch.setattr(preparation, 'time', SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda _: None))
+    def response(method, path, *args, **kwargs):
+        calls.append(method)
+        if method == 'POST':
+            return frame('queued'), {}
+        if calls.count('GET') == 1:
+            clock[0] += 61
+            return frame('learning'), {}
+        return frame('ready'), {}
+    if asynchronous:
+        async def run():
+            async with sdk.AsyncClient(KEY) as client:
+                async def send(*args, **kwargs):
+                    return response(*args, **kwargs)
+                monkeypatch.setattr(client, '_send', send)
+                assert isinstance(await client.prepare_and_wait(shape()), sdk.ReadyMaterial)
+        asyncio.run(run())
+    else:
+        with sdk.Client(KEY) as client:
+            monkeypatch.setattr(client, '_send', response)
+            assert isinstance(client.prepare_and_wait(shape()), sdk.ReadyMaterial)
+    assert calls == ['POST', 'GET', 'GET']

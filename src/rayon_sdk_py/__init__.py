@@ -23,7 +23,7 @@ from .errors import (
     InvalidResponseError,
 )
 
-__version__ = "3.0.0rc1"
+__version__ = "3.0.0rc2"
 __all__ = [
     "Preparation", "ReadyMaterial", "PreparationError", "PreparationCancelledError",
     "Client",

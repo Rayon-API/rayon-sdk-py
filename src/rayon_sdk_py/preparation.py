@@ -157,7 +157,7 @@ class SyncPreparation:
             error.preparation_id = ident
             raise
 
-    def wait_until_ready(self, preparation_id: str, *, wait_timeout: float = 60) -> ReadyMaterial:
+    def wait_until_ready(self, preparation_id: str, *, wait_timeout: float = 1800) -> ReadyMaterial:
         ident = validate_id(preparation_id, self._api_key)
         deadline = _budget(wait_timeout)
         while True:
@@ -183,7 +183,7 @@ class SyncPreparation:
                 raise
             time.sleep(min(delay, max(0, deadline - time.monotonic())))
 
-    def prepare_and_wait(self, shape: PreparationRequest | FormPreparationRequest, *, wait_timeout: float = 60) -> ReadyMaterial:
+    def prepare_and_wait(self, shape: PreparationRequest | FormPreparationRequest, *, wait_timeout: float = 1800) -> ReadyMaterial:
         _budget(wait_timeout)
         value = self.prepare(shape)
         return _result(value) or self.wait_until_ready(value.preparation_id, wait_timeout=wait_timeout)
@@ -204,7 +204,7 @@ class AsyncPreparation:
             error.preparation_id = ident
             raise
 
-    async def wait_until_ready(self, preparation_id: str, *, wait_timeout: float = 60) -> ReadyMaterial:
+    async def wait_until_ready(self, preparation_id: str, *, wait_timeout: float = 1800) -> ReadyMaterial:
         ident = validate_id(preparation_id, self._api_key)
         deadline = _budget(wait_timeout)
         try:
@@ -233,7 +233,7 @@ class AsyncPreparation:
         except asyncio.CancelledError:
             raise PreparationCancelledError(ident) from None
 
-    async def prepare_and_wait(self, shape: PreparationRequest | FormPreparationRequest, *, wait_timeout: float = 60) -> ReadyMaterial:
+    async def prepare_and_wait(self, shape: PreparationRequest | FormPreparationRequest, *, wait_timeout: float = 1800) -> ReadyMaterial:
         _budget(wait_timeout)
         value = await self.prepare(shape)
         return _result(value) or await self.wait_until_ready(value.preparation_id, wait_timeout=wait_timeout)
