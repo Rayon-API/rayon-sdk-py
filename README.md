@@ -15,13 +15,13 @@ the target request.
 
 ## Install
 
-Release candidate for the preparation-required server contract.
+Custom material must be prepared before generation.
 Deploy the compatible server before migrating clients.
 
 Requires Python 3.10+.
 
 ```sh
-python -m pip install 'rayon-sdk-py>=3.0.0rc2,<4'
+python -m pip install 'rayon-sdk-py>=3.0.0,<4'
 ```
 
 ## Generate

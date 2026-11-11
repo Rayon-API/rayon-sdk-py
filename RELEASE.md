@@ -47,7 +47,7 @@ incomplete-family rejection, and exactly six form fields with a larger `a` value
 
 ## Managed-material release gate
 
-Candidate: 3.0.0-rc.2. Verify managed header generation, required custom preparation and ready references,
+Release: 3.0.0. Verify managed header generation, required custom preparation and ready references,
 materialless-preparation rejection, safe fallback metadata and all existing
 preparation/cancellation tests. Check package contents and a clean consumer.
 Publish only after the maintainer approves the API contract and release report.

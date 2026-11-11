@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.0
+
+- Require preparation for custom material; use ready references for generation.
+- Keep managed generation available without material fields.
+- Allow preparation waits up to 30 minutes and retain job IDs for resuming a wait.
+- Remove generation-time source uploads and automatic material replacement.
+
 ## 3.0.0-rc.2
 
 - Allow preparation waits up to 30 minutes by default; explicit timeouts and cancellation remain supported.
