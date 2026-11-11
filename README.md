@@ -15,13 +15,13 @@ the target request.
 
 ## Install
 
-Release candidate for the preparation-required server contract.
+Custom material must be prepared before generation.
 Deploy the compatible server before migrating clients.
 
 Requires Python 3.10+.
 
 ```sh
-python -m pip install 'rayon-sdk-py>=3.0.0rc1,<4'
+python -m pip install 'rayon-sdk-py>=3.0.0,<4'
 ```
 
 ## Generate
@@ -61,8 +61,11 @@ return an explicit error. Generation does not prepare material or retry automati
 
 ## Custom material requires preparation
 
+Preparation can take several minutes. Wait helpers return as soon as ready, with a
+30-minute default limit. Timeouts and cancellation leave the job available to resume.
+
 ```python
-ready = client.prepare_and_wait(explicit_shape, wait_timeout=60)
+ready = client.prepare_and_wait(explicit_shape)
 context = {k: v for k, v in explicit_shape.items() if k not in ("scripts", "material_ref")}
 result = client.generate({**context, "material_ref": ready.material_ref})
 ```
