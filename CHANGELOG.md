@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.0.1 (unreleased)
+
+- Accept managed preparation fallback responses and preserve `path` and `fallback_reason`.
+- Advertise fallback support automatically without changing generation request bodies.
+- Reject unknown or inconsistent fallback metadata and never replay generation automatically.
+
 ## 3.0.0
 
 - Require preparation for custom material; use ready references for generation.

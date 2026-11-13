@@ -21,6 +21,13 @@ from .validation import (
 )
 
 
+def _valid_generation_path(value):
+    return isinstance(value, dict) and (
+        (value.get("path") in (None, "native") and value.get("fallback_reason") is None)
+        or (value.get("path") == "isolated" and value.get("fallback_reason") == "material_preparing")
+    )
+
+
 class _BaseClient:
     def __init__(self, api_key, *, base_url="https://api.rayonapi.com", timeout=45):
         connection(api_key, base_url, timeout)
@@ -149,8 +156,9 @@ class Client(SyncPreparation, _BaseClient):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         body = validate_shape(shape)
-        value, metadata = self._send("POST", "/v1/shape", body)
-        if not isinstance(value, dict) or value.get("path") not in (None, "native") or value.get("fallback_reason") is not None:
+        value, metadata = self._send("POST", "/v1/shape", body,
+                                     headers={"X-Rayon-Capabilities": "managed-fallback-v1"})
+        if not _valid_generation_path(value):
             raise InvalidResponseError("Unexpected generation response; check request history before retrying.", **metadata)
         return parse_result(value, metadata, self._api_key, body.get("mode", "header"))
 
@@ -229,8 +237,9 @@ class AsyncClient(AsyncPreparation, _BaseClient):
         if self._closed:
             raise ValidationError("Rayon client is closed.")
         body = validate_shape(shape)
-        value, metadata = await self._send("POST", "/v1/shape", body)
-        if not isinstance(value, dict) or value.get("path") not in (None, "native") or value.get("fallback_reason") is not None:
+        value, metadata = await self._send("POST", "/v1/shape", body,
+                                           headers={"X-Rayon-Capabilities": "managed-fallback-v1"})
+        if not _valid_generation_path(value):
             raise InvalidResponseError("Unexpected generation response; check request history before retrying.", **metadata)
         return parse_result(value, metadata, self._api_key, body.get("mode", "header"))
 

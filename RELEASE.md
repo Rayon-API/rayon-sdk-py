@@ -63,3 +63,11 @@ then enforce the new solve contract. Publish core SDK major 3 before Playwright 
 Keep all account/context/readiness and billing checks. Do not move published tags.
 Refresh the Playwright registry lock entry after core JS is published; the new
 core version cannot resolve from npm before that publication.
+
+## Preparation availability patch (3.0.1, unreleased)
+
+Generation advertises `X-Rayon-Capabilities: managed-fallback-v1` automatically.
+Accept only native success without a fallback reason or isolated success with
+`fallback_reason: material_preparing`; preserve the metadata. Verify that no
+generation request is retried and native-only clients never dispatch fallback.
+Publish compatible SDKs before enabling the server capability migration.
