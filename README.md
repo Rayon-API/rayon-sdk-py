@@ -21,7 +21,7 @@ Deploy the compatible server before migrating clients.
 Requires Python 3.10+.
 
 ```sh
-python -m pip install 'rayon-sdk-py>=3.0.0,<4'
+python -m pip install 'rayon-sdk-py>=3.0.1,<4'
 ```
 
 ## Generate
@@ -58,6 +58,13 @@ check acceptance. Rayon returns no target cookies.
 Generation accepts ready managed material or a ready private reference. Custom
 scripts must go through preparation. Unsupported, expired or unprepared inputs
 return an explicit error. Generation does not prepare material or retry automatically.
+
+SDK 3.0.1 accepts a successful managed preparation fallback with `path: isolated`
+and `fallback_reason: material_preparing`. These fields remain available on the
+result so your application can report degraded operation. The SDK advertises this
+capability automatically; generation request bodies stay unchanged. Older SDKs
+remain native-only on a server configured for the capability migration. A fallback
+requires fresh managed material and is never an automatic retry by the SDK.
 
 ## Custom material requires preparation
 
