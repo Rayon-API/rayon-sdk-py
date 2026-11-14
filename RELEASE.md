@@ -64,7 +64,7 @@ Keep all account/context/readiness and billing checks. Do not move published tag
 Refresh the Playwright registry lock entry after core JS is published; the new
 core version cannot resolve from npm before that publication.
 
-## Preparation availability patch (3.0.1, unreleased)
+## Preparation availability patch (3.0.1)
 
 Generation advertises `X-Rayon-Capabilities: managed-fallback-v1` automatically.
 Accept only native success without a fallback reason or isolated success with

@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.1 (unreleased)
+## 3.0.1
 
 - Accept managed preparation fallback responses and preserve `path` and `fallback_reason`.
 - Advertise fallback support automatically without changing generation request bodies.
